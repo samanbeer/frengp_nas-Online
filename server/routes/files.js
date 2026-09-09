@@ -24,14 +24,61 @@ const upload = multer({
   },
 });
 
+// Fast in-memory directory cache with TTL
+const dirCache = new Map(); // key: `${user}:${cleanPath}` -> { data, timestamp }
+const DIR_CACHE_TTL_MS = 20 * 1000; // 20 seconds TTL
+
+function getCachedDir(user, cleanPath) {
+  const key = `${user}:${cleanPath}`;
+  const entry = dirCache.get(key);
+  if (entry && Date.now() - entry.timestamp < DIR_CACHE_TTL_MS) {
+    return entry.data;
+  }
+  return null;
+}
+
+function setCachedDir(user, cleanPath, data) {
+  const key = `${user}:${cleanPath}`;
+  dirCache.set(key, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+function invalidateDirCache(user, targetPath) {
+  if (!targetPath) return;
+  const cleanTarget = ftps.normalizePath(targetPath);
+  const parent = path.posix.dirname(cleanTarget);
+  dirCache.delete(`${user}:${cleanTarget}`);
+  dirCache.delete(`${user}:${parent}`);
+  dirCache.delete(`${user}:/`);
+}
+
 /**
  * GET /api/files/list
- * List directory contents
+ * List directory contents (cached with TTL, bypassed on explicit refresh)
  */
 router.get('/list', async (req, res) => {
   try {
     const targetPath = req.query.path || '/';
-    const result = await ftps.listDirectory(req.credentials, targetPath);
+    const isRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const cleanPath = ftps.normalizePath(targetPath);
+    const user = req.credentials.user || 'default';
+
+    // If not a forced refresh, check fast in-memory cache
+    if (!isRefresh) {
+      const cached = getCachedDir(user, cleanPath);
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(cached);
+      }
+    }
+
+    // Fetch fresh listing from FTPS server
+    const result = await ftps.listDirectory(req.credentials, cleanPath);
+    setCachedDir(user, cleanPath, result);
+
+    res.setHeader('X-Cache', isRefresh ? 'BYPASS' : 'MISS');
     res.json(result);
   } catch (err) {
     console.error('List error:', err);
@@ -154,6 +201,8 @@ router.post('/upload', upload.array('files'), async (req, res) => {
     });
   }
 
+  invalidateDirCache(req.credentials.user, targetDir);
+
   res.json({
     success: true,
     uploaded: results,
@@ -180,6 +229,8 @@ router.post('/mkdir', async (req, res) => {
     const cleanParent = ftps.normalizePath(parentPath || '/');
     const targetDir = cleanParent === '/' ? `/${cleanName}` : `${cleanParent}/${cleanName}`;
     await ftps.createDirectory(req.credentials, targetDir);
+
+    invalidateDirCache(req.credentials.user, cleanParent);
 
     res.json({ success: true, path: targetDir, name: cleanName });
   } catch (err) {
@@ -216,6 +267,10 @@ router.post('/rename', async (req, res) => {
     const newPath = parentDir === '/' ? `/${cleanNewName}` : `${parentDir}/${cleanNewName}`;
 
     await ftps.renameItem(req.credentials, cleanOldPath, newPath);
+
+    invalidateDirCache(req.credentials.user, cleanOldPath);
+    invalidateDirCache(req.credentials.user, newPath);
+
     res.json({ success: true, oldPath: cleanOldPath, newPath });
   } catch (err) {
     console.error('Rename error:', err);
@@ -243,6 +298,9 @@ router.delete('/delete', async (req, res) => {
     }
 
     await ftps.deleteItem(req.credentials, cleanPath, Boolean(isDirectory));
+
+    invalidateDirCache(req.credentials.user, cleanPath);
+
     res.json({ success: true, path: cleanPath });
   } catch (err) {
     console.error('Delete error:', err);
@@ -287,6 +345,8 @@ router.put('/write-text', async (req, res) => {
     }
 
     await ftps.writeTextFile(req.credentials, filePath, content);
+    invalidateDirCache(req.credentials.user, filePath);
+
     res.json({ success: true, path: filePath });
   } catch (err) {
     console.error('Write text error:', err);
