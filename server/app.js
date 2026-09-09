@@ -59,7 +59,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Production: serve built static frontend files if present (used in standalone node server)
-const distPath = path.join(__dirname, '../client/dist');
+const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 
