@@ -1,0 +1,20 @@
+[Unit]
+Description=NAS Cloud File Manager (nas.saman.beer)
+After=network.target
+
+[Service]
+Type=simple
+User=samot
+WorkingDirectory=/home/samot/Documents/nas_website
+ExecStart=/usr/bin/node /home/samot/Documents/nas_website/server/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=5000
+
+# Bezpečnostní omezení
+ProtectSystem=full
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

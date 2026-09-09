@@ -1,0 +1,24 @@
+# Konfigurace pro Caddy (automatický HTTPS certifikát přes Let's Encrypt)
+# Umístění: /etc/caddy/Caddyfile
+
+nas.saman.beer {
+    # Přeposílání na běžící Node.js aplikaci
+    reverse_proxy 127.0.0.1:5000 {
+        # Neomezovat velikost uploadu
+        transport http {
+            read_buffer 4096
+        }
+    }
+
+    # Bezpečnostní hlavičky
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+
+    # Logování
+    log {
+        output file /var/log/caddy/nas.saman.beer.log
+    }
+}
