@@ -43,24 +43,24 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(401).json({
         error: 'Chyba přihlášení: Nesprávné heslo nebo nedostupný FTPS server.',
         code: 'AUTH_FAILED',
-        details: ftpError.message,
+        details: config.IS_PRODUCTION ? undefined : ftpError.message,
       });
     }
 
     // Credentials valid! Create secure session
     const token = createSession(user, password);
 
-    // Set HttpOnly cookie
+    // Set secure HttpOnly cookie
     res.cookie('nas_session', token, {
       httpOnly: true,
       secure: config.IS_PRODUCTION,
       sameSite: 'lax',
+      path: '/',
       maxAge: config.SESSION_TTL_MS,
     });
 
     res.json({
       success: true,
-      token,
       user: {
         username: user,
         host: config.FTPS_HOST,
@@ -81,7 +81,12 @@ router.post('/logout', (req, res) => {
   if (token) {
     destroySession(token);
   }
-  res.clearCookie('nas_session');
+  res.clearCookie('nas_session', {
+    httpOnly: true,
+    secure: config.IS_PRODUCTION,
+    sameSite: 'lax',
+    path: '/',
+  });
   res.json({ success: true, message: 'Byli jste úspěšně odhlášeni.' });
 });
 
