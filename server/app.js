@@ -35,6 +35,7 @@ app.use(
 // Whitelisted CORS origins
 const allowedOrigins = [
   'https://salat.fit',
+  'https://www.salat.fit',
   'http://localhost:5173',
   'http://localhost:5000',
   'http://localhost:3000',
@@ -55,13 +56,18 @@ app.use(
         return callback(null, true);
       }
 
+      // Allow salat.fit and any subdomains (*.salat.fit)
+      if (/^https:\/\/(?:[a-zA-Z0-9-]+\.)*salat\.fit$/.test(origin)) {
+        return callback(null, true);
+      }
+
       // Allow Vercel preview environments (*.vercel.app)
       if (/^https:\/\/[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
 
-      // Reject all unauthorized origins
-      return callback(new Error('CORS policy: Nepovolený původ požadavku.'), false);
+      // Reject all unauthorized origins gracefully (without 500 error)
+      return callback(null, false);
     },
     credentials: true,
   })

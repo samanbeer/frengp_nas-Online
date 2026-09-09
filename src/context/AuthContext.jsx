@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     async function init() {
       try {
-        const configRes = await fetch('/api/auth/config');
+        const configRes = await fetch('/api/auth/config', { cache: 'no-store' });
         if (configRes.ok) {
           const configData = await configRes.json();
           setServerConfig(configData);
@@ -25,15 +25,22 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const meRes = await fetch('/api/auth/me');
+        const meRes = await fetch('/api/auth/me', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
         if (meRes.ok) {
           const data = await meRes.json();
           if (data.authenticated) {
             setUser(data.user);
+          } else {
+            setUser(null);
           }
+        } else {
+          setUser(null);
         }
       } catch (err) {
-        // Not authenticated
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -45,6 +52,7 @@ export function AuthProvider({ children }) {
   const login = async (password, username) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         password,
@@ -63,7 +71,13 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
     } finally {
       setUser(null);
     }

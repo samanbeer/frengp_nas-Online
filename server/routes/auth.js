@@ -49,15 +49,18 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     // Credentials valid! Create secure session
     const token = createSession(user, password);
+    const isSecure = Boolean(req.secure || req.headers['x-forwarded-proto'] === 'https' || config.IS_PRODUCTION);
 
     // Set secure HttpOnly cookie
     res.cookie('nas_session', token, {
       httpOnly: true,
-      secure: config.IS_PRODUCTION,
+      secure: isSecure,
       sameSite: 'lax',
       path: '/',
       maxAge: config.SESSION_TTL_MS,
     });
+
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     res.json({
       success: true,
@@ -81,17 +84,33 @@ router.post('/logout', (req, res) => {
   if (token) {
     destroySession(token);
   }
-  res.clearCookie('nas_session', {
-    httpOnly: true,
-    secure: config.IS_PRODUCTION,
-    sameSite: 'lax',
-    path: '/',
-  });
+
+  // Prevent browser or proxy caching of logout response
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  // Thoroughly clear cookie for all path and protocol combinations to handle legacy cookies
+  const clearHeaders = [
+    'nas_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax; Secure',
+    'nas_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax',
+    'nas_session=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax; Secure',
+    'nas_session=; Path=/api; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax',
+    'nas_session=; Path=/api/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax; Secure',
+    'nas_session=; Path=/api/auth; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax',
+  ];
+  res.setHeader('Set-Cookie', clearHeaders);
+
   res.json({ success: true, message: 'Byli jste úspěšně odhlášeni.' });
 });
 
 // Check current authentication session
 router.get('/me', authMiddleware, (req, res) => {
+  // Never cache session status
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   res.json({
     authenticated: true,
     user: {
