@@ -78,9 +78,30 @@ Aplikace poběží na portu `5000`: [http://localhost:5000](http://localhost:500
 
 ---
 
-## 🌐 Nastavení domény `nas.saman.beer`
+## ⚡ Nasazení na Vercel (Doporučeno pro nas.saman.beer)
 
-Pro zpřístupnění aplikace na doméně `nas.saman.beer` stačí:
+Aplikace je plně uzpůsobena pro bezproblémový běh na **Vercelu** (statický frontend + Serverless backend):
+
+1. Přejděte na [vercel.com](https://vercel.com) a přihlaste se přes svůj **GitHub**.
+2. Klikněte na **Add New...** -> **Project**.
+3. Vyberte repozitář **`frengp_nas-Online`** a klikněte na **Import**.
+4. V sekci **Environment Variables** přidejte:
+   - `FTPS_HOST`: `nas.frengp.cz`
+   - `FTPS_PORT`: `21`
+   - `SESSION_SECRET`: *(zadejte libovolný dlouhý náhodný řetězec, např. 32 znaků)*
+   - `FTPS_REJECT_UNAUTHORIZED`: `false`
+5. Klikněte na **Deploy**. Vercel automaticky zkompiluje frontend i serverless API.
+6. **Propojení s doménou `nas.saman.beer`**:
+   - V projektu na Vercelu přejděte do **Settings** -> **Domains**.
+   - Zadejte `nas.saman.beer` a klikněte na **Add**.
+   - Vercel vám zobrazí DNS záznam (např. `CNAME cname.vercel-dns.com`).
+   - Tento záznam vložte do administrace své domény u registrátora. Vercel automaticky vystaví a obnovuje SSL HTTPS certifikát!
+
+---
+
+## 🌐 Alternativa: Vlastní Linux Server / VPS (`nas.saman.beer`)
+
+Pokud chcete aplikaci provozovat na vlastním serveru:
 
 ### Krok 1: DNS záznam
 V administraci vaší domény nastavte **A záznam**:
