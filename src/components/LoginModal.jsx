@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Server, Lock, User, ArrowRight, Loader2, Shield, Info, Mail } from 'lucide-react';
+import { COMMIT_ID } from '../utils/formatters';
 
 export default function LoginModal() {
   const { login, serverConfig } = useAuth();
@@ -159,6 +160,13 @@ export default function LoginModal() {
           <span>tomas.pachomov@frengp.cz</span>
         </a>
       </div>
+
+      {/* Bottom right commit hash */}
+      {COMMIT_ID && (
+        <div className="fixed bottom-3 right-4 z-20 text-[11px] font-mono text-zinc-600 select-none">
+          {COMMIT_ID}
+        </div>
+      )}
     </div>
   );
 }

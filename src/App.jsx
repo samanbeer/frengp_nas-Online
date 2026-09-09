@@ -11,7 +11,7 @@ import AudioPreviewModal from './components/Modals/AudioPreviewModal';
 import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
-import { getFileCategory, formatBytes } from './utils/formatters';
+import { getFileCategory, formatBytes, COMMIT_ID } from './utils/formatters';
 import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
 
 // Fast client-side cache for instant directory transitions
@@ -296,8 +296,14 @@ export default function App() {
             <span className="hidden sm:inline">Celkem: {stats.folders} složek, {stats.files} souborů</span>
             {stats.files > 0 && <span className="hidden sm:inline"> ({formatBytes(stats.totalSize)})</span>}
           </div>
-          <div className="text-zinc-600">
-            FTPS TLS 1.3 • {user?.username}@{user?.host}
+          <div className="flex items-center gap-2 text-zinc-600">
+            <span>FTPS TLS 1.3 • {user?.username}@{user?.host}</span>
+            {COMMIT_ID && (
+              <>
+                <span className="text-zinc-700">•</span>
+                <span className="text-zinc-500 font-mono select-none">{COMMIT_ID}</span>
+              </>
+            )}
           </div>
         </div>
       </footer>

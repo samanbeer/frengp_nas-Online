@@ -55,3 +55,9 @@ export function getFileCategory(filename = '') {
 
   return 'other';
 }
+
+/**
+ * Injected at build time via Vite define (__COMMIT_HASH__)
+ */
+export const COMMIT_ID = typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : '';
+
