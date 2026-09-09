@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Server, Lock, User, ArrowRight, Loader2, Shield } from 'lucide-react';
+import { Server, Lock, User, ArrowRight, Loader2, Shield, Info } from 'lucide-react';
 
 export default function LoginModal() {
   const { login, serverConfig } = useAuth();
@@ -35,7 +35,7 @@ export default function LoginModal() {
         {/* Main Card */}
         <div className="enterprise-card rounded-xl p-6 shadow-xl border border-zinc-800 bg-zinc-900/80">
           {/* Header */}
-          <div className="mb-6">
+          <div className="mb-5">
             <div className="flex items-center justify-between mb-4">
               <div className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-200">
                 <Server className="w-4 h-4" />
@@ -52,6 +52,14 @@ export default function LoginModal() {
             <p className="text-xs text-zinc-400 mt-0.5">
               Připojení k úložišti <span className="font-mono text-zinc-300">{serverConfig.host || 'nas.frengp.cz'}</span>
             </p>
+          </div>
+
+          {/* School credentials info message */}
+          <div className="mb-4 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200 text-xs flex items-start gap-2">
+            <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="leading-snug text-[11px] text-blue-300">
+              Přihlašovací jméno a heslo jsou stejné jako při přihlašování zevnitř školy.
+            </div>
           </div>
 
           {/* Error message */}
