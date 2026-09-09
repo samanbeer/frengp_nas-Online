@@ -6,12 +6,12 @@ const { createSession, destroySession } = require('../auth');
 const authMiddleware = require('../middleware/authMiddleware');
 const { loginLimiter } = require('../middleware/rateLimiter');
 
-// Public config: default host & default username
+// Public config: host & port only (no credentials leaked)
 router.get('/config', (req, res) => {
   res.json({
     host: config.FTPS_HOST,
-    defaultUser: config.FTPS_USER,
     port: config.FTPS_PORT,
+    hasDefaultUser: Boolean(config.FTPS_USER),
   });
 });
 
@@ -20,6 +20,13 @@ router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { password, username } = req.body;
     const user = (username && username.trim()) || config.FTPS_USER;
+
+    if (!user) {
+      return res.status(400).json({
+        error: 'Zadejte prosím uživatelské jméno.',
+        code: 'MISSING_USERNAME',
+      });
+    }
 
     if (!password) {
       return res.status(400).json({
