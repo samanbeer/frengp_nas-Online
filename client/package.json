@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd .. && npx vite build",
+    "build": "cd .. && npx vite build && cp -r dist client/ 2>/dev/null || true",
     "install": "cd .. && npm install"
   }
 }
