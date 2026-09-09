@@ -1,15 +1,12 @@
 import React from 'react';
 import { getFileIcon } from '../utils/fileIcons';
-import { formatBytes, formatDate, getFileCategory } from '../utils/formatters';
+import { formatBytes, getFileCategory } from '../utils/formatters';
 import FileItemActions from './FileItemActions';
 
 export default function FileGrid({
   items,
   onNavigate,
   onPreview,
-  onEdit,
-  onRename,
-  onDelete,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -19,7 +16,6 @@ export default function FileGrid({
       if (['image', 'video', 'audio', 'pdf', 'code'].includes(category)) {
         onPreview(item);
       } else {
-        // Direct download
         const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
         window.open(url, '_blank');
       }
@@ -27,43 +23,40 @@ export default function FileGrid({
   };
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
       {items.map((item) => (
         <div
           key={item.path}
           onClick={() => handleItemClick(item)}
-          className="group relative flex flex-col justify-between p-3.5 rounded-2xl glass-card cursor-pointer"
+          className="group relative flex flex-col justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900 transition-colors cursor-pointer select-none"
         >
-          {/* Top row: item type tag / actions */}
-          <div className="flex items-center justify-between gap-1 mb-2">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 truncate">
+          {/* Top row */}
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[10px] uppercase font-mono text-zinc-500 truncate">
               {item.isDirectory ? 'Složka' : item.extension || 'Soubor'}
             </span>
             <div onClick={(e) => e.stopPropagation()}>
               <FileItemActions
                 item={item}
                 onPreview={onPreview}
-                onEdit={onEdit}
-                onRename={onRename}
-                onDelete={onDelete}
               />
             </div>
           </div>
 
-          {/* Center icon / thumbnail preview */}
-          <div className="flex-1 flex flex-col items-center justify-center py-4 group-hover:scale-105 transition-transform duration-200">
-            {getFileIcon(item, 'w-12 h-12')}
+          {/* Center icon */}
+          <div className="flex-1 flex flex-col items-center justify-center py-3">
+            {getFileIcon(item, 'w-8 h-8')}
           </div>
 
           {/* Bottom info */}
-          <div className="mt-2 text-center">
+          <div className="mt-1 text-center">
             <div
-              className="text-xs font-medium text-slate-200 truncate group-hover:text-brand-400 transition-colors"
+              className="text-xs font-medium text-zinc-200 truncate group-hover:text-white transition-colors"
               title={item.name}
             >
               {item.name}
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">
+            <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
               {item.isDirectory ? '-' : formatBytes(item.size)}
             </div>
           </div>

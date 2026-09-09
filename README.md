@@ -2,7 +2,7 @@
 
 Moderní, rychlá a zabezpečená webová aplikace pro správu souborů na vašem NAS serveru (`ftps://nas.frengp.cz`) určená pro běh na doméně **`nas.saman.beer`**.
 
-Uživatel se přihlašuje jednoduše zadáním hesla (výchozí uživatel je nastaven na `Student`).
+Uživatel se přihlašuje zadáním svých přihlašovacích údajů k FTPS serveru.
 
 ---
 
@@ -128,7 +128,7 @@ Soubor `.env` v kořenovém adresáři obsahuje nastavení:
 | `PORT` | Port, na kterém běží Node.js server | `5000` |
 | `FTPS_HOST` | Adresa FTPS serveru | `nas.frengp.cz` |
 | `FTPS_PORT` | FTPS Port (standardní FTP s explicit TLS) | `21` |
-| `FTPS_USER` | Výchozí přihlašovací uživatel | `Student` |
+| `FTPS_USER` | Volitelný výchozí přihlašovací uživatel | `""` (prázdné) |
 | `SESSION_SECRET` | Tajný klíč pro šifrování relací v paměti | *(vygenerovaný náhodný hash)* |
 | `SESSION_TTL_HOURS` | Doba platnosti přihlášení (v hodinách) | `24` |
 | `NODE_ENV` | Režim prostředí (`development` / `production`) | `production` |

@@ -7,7 +7,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [serverConfig, setServerConfig] = useState({
     host: 'nas.frengp.cz',
-    defaultUser: 'Student',
+    port: 21,
+    hasDefaultUser: false,
   });
 
   // Fetch server public config and check auth state on load
@@ -47,7 +48,7 @@ export function AuthProvider({ children }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         password,
-        username: username || serverConfig.defaultUser,
+        username: (username && username.trim()) || undefined,
       }),
     });
 

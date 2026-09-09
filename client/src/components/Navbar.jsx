@@ -1,57 +1,56 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Server, LogOut, RefreshCw, HardDrive, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Server, LogOut, RefreshCw, Shield, Lock } from 'lucide-react';
 
-export default function Navbar({ onRefresh, refreshing, darkMode, setDarkMode }) {
+export default function Navbar({ onRefresh, refreshing }) {
   const { user, logout, serverConfig } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-white/10 glass-panel">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Left: Brand */}
+    <header className="sticky top-0 z-30 w-full border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        {/* Left: Brand & Badges */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-500 flex items-center justify-center shadow-md shadow-brand-500/20">
-            <HardDrive className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700/80 flex items-center justify-center text-zinc-200">
+            <Server className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-white">NAS Cloud</span>
-              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                <ShieldCheck className="w-3 h-3" />
-                FTPS
-              </span>
-            </div>
-            <div className="text-xs text-slate-400 font-mono hidden md:block">
-              {serverConfig.host}
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm tracking-tight text-zinc-100">NAS Storage</span>
+            <span className="text-zinc-500 text-xs hidden sm:inline">•</span>
+            <span className="text-xs font-mono text-zinc-400 hidden sm:inline">{serverConfig.host}</span>
+          </div>
+
+          {/* Read Only Status Pill */}
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-zinc-800 bg-zinc-900/60 text-[11px] font-medium text-zinc-400">
+            <Lock className="w-3 h-3 text-zinc-400" />
+            <span>POUZE PRO ČTENÍ</span>
           </div>
         </div>
 
         {/* Right: Actions & User profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
           {/* Refresh button */}
           <button
             onClick={onRefresh}
             disabled={refreshing}
-            title="Obnovit soubory"
-            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors cursor-pointer"
+            title="Obnovit seznam souborů"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-800 transition-colors cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-zinc-200' : ''}`} />
           </button>
 
-          {/* User info pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300">
-            <div className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-medium text-slate-200">{user?.username || 'Student'}</span>
+          {/* User info */}
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 font-mono">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>{user?.username || 'Uživatel'}</span>
           </div>
 
           {/* Logout button */}
           <button
             onClick={logout}
             title="Odhlásit se"
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-950/20 border border-zinc-800 hover:border-red-900/50 transition-colors cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
