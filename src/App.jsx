@@ -14,6 +14,10 @@ import TextViewerModal from './components/Modals/TextViewerModal';
 import { getFileCategory, formatBytes } from './utils/formatters';
 import { Loader2, FolderOpen, AlertCircle } from 'lucide-react';
 
+// Fast client-side cache for instant directory transitions
+const clientDirCache = new Map(); // path -> { items, currentPath, timestamp }
+const inflightPrefetches = new Map(); // path -> Promise
+
 export default function App() {
   const { user, loading: authLoading } = useAuth();
 
@@ -37,22 +41,67 @@ export default function App() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
 
-  // Fetch files in directory
+  // Prefetch directory on hover
+  const prefetch = useCallback((targetPath) => {
+    if (!user || !targetPath) return;
+    if (clientDirCache.has(targetPath)) return;
+    if (inflightPrefetches.has(targetPath)) return;
+
+    const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.items) {
+          clientDirCache.set(targetPath, {
+            items: data.items,
+            currentPath: data.currentPath || targetPath,
+            timestamp: Date.now(),
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        inflightPrefetches.delete(targetPath);
+      });
+
+    inflightPrefetches.set(targetPath, req);
+  }, [user]);
+
+  // Fetch files in directory with instant SWR and refresh support
   const loadFiles = useCallback(async (targetPath = currentPath, isRefresh = false) => {
     if (!user) return;
-    if (isRefresh) setRefreshing(true);
-    else setLoadingFiles(true);
+
+    if (isRefresh) {
+      // Forced refresh: clear client cache for this directory
+      clientDirCache.delete(targetPath);
+      setRefreshing(true);
+    } else {
+      // Instant SWR: if cached, render immediately (0 ms)
+      const cached = clientDirCache.get(targetPath);
+      if (cached) {
+        setItems(cached.items || []);
+        setCurrentPath(cached.currentPath || targetPath);
+      } else {
+        setLoadingFiles(true);
+      }
+    }
     setError(null);
 
     try {
-      const res = await fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`);
+      const url = `/api/files/list?path=${encodeURIComponent(targetPath)}${isRefresh ? '&refresh=true&_t=' + Date.now() : ''}`;
+      const res = await fetch(url, { cache: isRefresh ? 'no-store' : 'default' });
       const data = await res.json();
+
       if (!res.ok) {
         // If initial '/Vyuka' fails, try falling back to root '/'
         if (targetPath === '/Vyuka') {
           const fallbackRes = await fetch('/api/files/list?path=/');
           const fallbackData = await fallbackRes.json();
           if (fallbackRes.ok) {
+            clientDirCache.set('/', {
+              items: fallbackData.items || [],
+              currentPath: '/',
+              timestamp: Date.now(),
+            });
             setItems(fallbackData.items || []);
             setCurrentPath('/');
             return;
@@ -60,6 +109,14 @@ export default function App() {
         }
         throw new Error(data.error || 'Nepodařilo se načíst soubory.');
       }
+
+      // Update client cache
+      clientDirCache.set(targetPath, {
+        items: data.items || [],
+        currentPath: data.currentPath || targetPath,
+        timestamp: Date.now(),
+      });
+
       setItems(data.items || []);
       setCurrentPath(data.currentPath || targetPath);
     } catch (err) {
@@ -160,6 +217,7 @@ export default function App() {
         <Breadcrumbs
           currentPath={currentPath}
           onNavigate={(path) => loadFiles(path)}
+          onPrefetch={prefetch}
         />
 
         {/* Action Toolbar */}
@@ -210,12 +268,14 @@ export default function App() {
               items={filteredAndSortedItems}
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
+              onPrefetch={prefetch}
             />
           ) : (
             <FileGrid
               items={filteredAndSortedItems}
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
+              onPrefetch={prefetch}
             />
           )}
         </div>
