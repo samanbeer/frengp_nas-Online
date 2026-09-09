@@ -1,11 +1,10 @@
 const crypto = require('crypto');
 const config = require('./config');
 
-// In-memory active session cache
-// Sessions store encrypted credentials to communicate with FTPS on behalf of the user
+// In-memory active session cache for local speed
 const sessions = new Map();
 
-// Helper to encrypt sensitive string in memory using AES-256-GCM
+// Helper to encrypt sensitive JSON payload using AES-256-GCM
 function encrypt(text) {
   const iv = crypto.randomBytes(12);
   const key = crypto.createHash('sha256').update(config.SESSION_SECRET).digest();
@@ -36,48 +35,76 @@ function decrypt(ciphertext) {
 }
 
 function createSession(user, password) {
-  const token = crypto.randomBytes(32).toString('hex');
   const now = Date.now();
-  const session = {
-    id: token,
+  const expiresAt = now + config.SESSION_TTL_MS;
+
+  // Stateless encrypted payload: works across any serverless instance (Vercel)
+  const payload = JSON.stringify({
     user,
-    encryptedPassword: encrypt(password),
-    createdAt: now,
+    password,
+    exp: expiresAt,
+    iat: now,
+  });
+
+  const token = encrypt(payload);
+
+  // Also cache in memory for local speed
+  sessions.set(token, {
+    user,
+    password,
+    expiresAt,
     lastAccess: now,
-    expiresAt: now + config.SESSION_TTL_MS,
-  };
-  sessions.set(token, session);
+  });
+
   return token;
 }
 
 function getSession(token) {
   if (!token) return null;
-  const session = sessions.get(token);
-  if (!session) return null;
 
-  // Check if expired
-  if (Date.now() > session.expiresAt) {
-    sessions.delete(token);
-    return null;
+  // 1. Check in-memory cache
+  const cached = sessions.get(token);
+  if (cached) {
+    if (Date.now() > cached.expiresAt) {
+      sessions.delete(token);
+      return null;
+    }
+    cached.lastAccess = Date.now();
+    return {
+      id: token,
+      user: cached.user,
+      password: cached.password,
+    };
   }
 
-  // Update lastAccess and slide expiration
-  session.lastAccess = Date.now();
-  session.expiresAt = session.lastAccess + config.SESSION_TTL_MS;
+  // 2. Fallback: decrypt stateless token (crucial for Vercel serverless cold starts)
+  const decrypted = decrypt(token);
+  if (!decrypted) return null;
 
-  const password = decrypt(session.encryptedPassword);
-  if (!password) {
-    sessions.delete(token);
+  try {
+    const data = JSON.parse(decrypted);
+    if (!data.user || !data.password || !data.exp) return null;
+
+    if (Date.now() > data.exp) {
+      return null;
+    }
+
+    // Populate memory cache
+    sessions.set(token, {
+      user: data.user,
+      password: data.password,
+      expiresAt: data.exp,
+      lastAccess: Date.now(),
+    });
+
+    return {
+      id: token,
+      user: data.user,
+      password: data.password,
+    };
+  } catch (e) {
     return null;
   }
-
-  return {
-    id: session.id,
-    user: session.user,
-    password,
-    createdAt: session.createdAt,
-    lastAccess: session.lastAccess,
-  };
 }
 
 function destroySession(token) {
@@ -95,6 +122,7 @@ const cleanupInterval = setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+
 if (cleanupInterval.unref) {
   cleanupInterval.unref();
 }
