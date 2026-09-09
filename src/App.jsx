@@ -12,7 +12,7 @@ import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
 import { getFileCategory, formatBytes } from './utils/formatters';
-import { Loader2, FolderOpen, AlertCircle } from 'lucide-react';
+import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
 
 // Fast client-side cache for instant directory transitions
 const clientDirCache = new Map(); // path -> { items, currentPath, timestamp }
@@ -283,10 +283,18 @@ export default function App() {
 
       {/* Footer bar */}
       <footer className="border-t border-zinc-800/80 bg-zinc-950 py-2.5 text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-1 font-mono text-[11px]">
-          <div>
-            <span>Celkem: {stats.folders} složek, {stats.files} souborů</span>
-            {stats.files > 0 && <span> ({formatBytes(stats.totalSize)})</span>}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono text-[11px]">
+          <div className="flex items-center gap-3">
+            <a
+              href="mailto:tomas.pachomov@frengp.cz"
+              className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              <Mail className="w-3.5 h-3.5 text-zinc-500" />
+              <span>tomas.pachomov@frengp.cz</span>
+            </a>
+            <span className="text-zinc-700 hidden sm:inline">•</span>
+            <span className="hidden sm:inline">Celkem: {stats.folders} složek, {stats.files} souborů</span>
+            {stats.files > 0 && <span className="hidden sm:inline"> ({formatBytes(stats.totalSize)})</span>}
           </div>
           <div className="text-zinc-600">
             FTPS TLS 1.3 • {user?.username}@{user?.host}
