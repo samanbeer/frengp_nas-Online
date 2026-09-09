@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Server, Lock, User, ArrowRight, Loader2, Shield, Info } from 'lucide-react';
+import { Server, Lock, User, ArrowRight, Loader2, Shield, Info, Mail } from 'lucide-react';
 
 export default function LoginModal() {
   const { login, serverConfig } = useAuth();
@@ -30,7 +30,7 @@ export default function LoginModal() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-zinc-950">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-zinc-950 relative">
       <div className="w-full max-w-sm">
         {/* Main Card */}
         <div className="enterprise-card rounded-xl p-6 shadow-xl border border-zinc-800 bg-zinc-900/80">
@@ -47,7 +47,7 @@ export default function LoginModal() {
             </div>
 
             <h1 className="text-lg font-semibold text-zinc-100 tracking-tight">
-              NAS Souborový Manažer
+              NAS Vyuka
             </h1>
             <p className="text-xs text-zinc-400 mt-0.5">
               Připojení k úložišti <span className="font-mono text-zinc-300">{serverConfig.host || 'nas.frengp.cz'}</span>
@@ -147,6 +147,17 @@ export default function LoginModal() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Bottom left email */}
+      <div className="fixed bottom-3 left-4 z-20 text-[11px] font-mono text-zinc-500">
+        <a
+          href="mailto:tomas.pachomov@frengp.cz"
+          className="inline-flex items-center gap-1.5 hover:text-zinc-300 transition-colors"
+        >
+          <Mail className="w-3.5 h-3.5 text-zinc-600" />
+          <span>tomas.pachomov@frengp.cz</span>
+        </a>
       </div>
     </div>
   );
