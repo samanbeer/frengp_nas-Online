@@ -1,5 +1,11 @@
 require('dotenv').config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'nas-super-secret-key-change-in-production')) {
+  console.warn('⚠️ VAROVÁNÍ: V produkci běží výchozí nebo chybějící SESSION_SECRET! Nastavte silný unikátní klíč v proměnných prostředí.');
+}
+
 module.exports = {
   PORT: parseInt(process.env.PORT, 10) || 5000,
   FTPS_HOST: process.env.FTPS_HOST || 'nas.frengp.cz',
@@ -9,5 +15,9 @@ module.exports = {
   SESSION_SECRET: process.env.SESSION_SECRET || 'nas-super-secret-key-change-in-production',
   SESSION_TTL_MS: (parseInt(process.env.SESSION_TTL_HOURS, 10) || 24) * 60 * 60 * 1000,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  IS_PRODUCTION: process.env.NODE_ENV === 'production',
+  IS_PRODUCTION: isProduction,
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+    : [],
 };
+

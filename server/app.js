@@ -11,6 +11,9 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
+// Trust reverse proxy (Vercel, Cloudflare, Nginx) for proper IP rate-limiting and secure cookies
+app.set('trust proxy', 1);
+
 // Security HTTP headers
 app.use(
   helmet({
@@ -29,10 +32,37 @@ app.use(
   })
 );
 
-// CORS configuration
+// Whitelisted CORS origins
+const allowedOrigins = [
+  'https://salat.fit',
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5000',
+  ...config.ALLOWED_ORIGINS,
+];
+
+// CORS configuration with whitelist protection
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, same-origin browser navigations, curl)
+      if (!origin) return callback(null, true);
+
+      // Check explicit allowed origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow Vercel preview environments (*.vercel.app)
+      if (/^https:\/\/[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Reject all unauthorized origins
+      return callback(new Error('CORS policy: Nepovolený původ požadavku.'), false);
+    },
     credentials: true,
   })
 );

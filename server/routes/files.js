@@ -117,8 +117,20 @@ router.post('/upload', upload.array('files'), async (req, res) => {
   const errors = [];
 
   for (const file of files) {
-    const cleanName = path.posix.basename(file.originalname);
-    const destinationPath = targetDir === '/' ? `/${cleanName}` : `${targetDir}/${cleanName}`;
+    // Safely extract filename handling both Windows and POSIX separators
+    const rawName = file.originalname.split(/[\\/]/).pop() || 'upload';
+    const cleanName = rawName.replace(/[/\\?%*:|"<>]/g, '').trim();
+
+    if (!cleanName || cleanName === '.' || cleanName === '..') {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlink(file.path, () => {});
+      }
+      errors.push({ name: file.originalname, error: 'Neplatný název souboru.' });
+      continue;
+    }
+
+    const cleanTargetDir = ftps.normalizePath(targetDir);
+    const destinationPath = cleanTargetDir === '/' ? `/${cleanName}` : `${cleanTargetDir}/${cleanName}`;
 
     try {
       const readStream = fs.createReadStream(file.path);
@@ -129,7 +141,9 @@ router.post('/upload', upload.array('files'), async (req, res) => {
       errors.push({ name: cleanName, error: uploadErr.message });
     } finally {
       // Clean up temp file
-      fs.unlink(file.path, () => {});
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlink(file.path, () => {});
+      }
     }
   }
 
@@ -159,11 +173,12 @@ router.post('/mkdir', async (req, res) => {
     }
 
     const cleanName = name.replace(/[/\\?%*:|"<>]/g, '').trim();
-    if (!cleanName) {
+    if (!cleanName || cleanName === '.' || cleanName === '..') {
       return res.status(400).json({ error: 'Název složky obsahuje nepovolené znaky.' });
     }
 
-    const targetDir = parentPath === '/' ? `/${cleanName}` : `${parentPath || '/'}/${cleanName}`;
+    const cleanParent = ftps.normalizePath(parentPath || '/');
+    const targetDir = cleanParent === '/' ? `/${cleanName}` : `${cleanParent}/${cleanName}`;
     await ftps.createDirectory(req.credentials, targetDir);
 
     res.json({ success: true, path: targetDir, name: cleanName });
@@ -183,20 +198,25 @@ router.post('/mkdir', async (req, res) => {
 router.post('/rename', async (req, res) => {
   try {
     const { oldPath, newName } = req.body;
-    if (!oldPath || !newName) {
+    if (!oldPath || !newName || typeof newName !== 'string') {
       return res.status(400).json({ error: 'Chybí parametry oldPath nebo newName.' });
     }
 
     const cleanNewName = newName.replace(/[/\\?%*:|"<>]/g, '').trim();
-    if (!cleanNewName) {
+    if (!cleanNewName || cleanNewName === '.' || cleanNewName === '..') {
       return res.status(400).json({ error: 'Nový název obsahuje nepovolené znaky.' });
     }
 
-    const parentDir = path.posix.dirname(oldPath);
+    const cleanOldPath = ftps.normalizePath(oldPath);
+    if (cleanOldPath === '/' || cleanOldPath === '') {
+      return res.status(400).json({ error: 'Nelze přejmenovat kořenový adresář.' });
+    }
+
+    const parentDir = path.posix.dirname(cleanOldPath);
     const newPath = parentDir === '/' ? `/${cleanNewName}` : `${parentDir}/${cleanNewName}`;
 
-    await ftps.renameItem(req.credentials, oldPath, newPath);
-    res.json({ success: true, oldPath, newPath });
+    await ftps.renameItem(req.credentials, cleanOldPath, newPath);
+    res.json({ success: true, oldPath: cleanOldPath, newPath });
   } catch (err) {
     console.error('Rename error:', err);
     res.status(500).json({
@@ -217,8 +237,13 @@ router.delete('/delete', async (req, res) => {
       return res.status(400).json({ error: 'Chybí parametr path.' });
     }
 
-    await ftps.deleteItem(req.credentials, targetPath, Boolean(isDirectory));
-    res.json({ success: true, path: targetPath });
+    const cleanPath = ftps.normalizePath(targetPath);
+    if (cleanPath === '/' || cleanPath === '') {
+      return res.status(400).json({ error: 'Nelze smazat kořenový adresář.' });
+    }
+
+    await ftps.deleteItem(req.credentials, cleanPath, Boolean(isDirectory));
+    res.json({ success: true, path: cleanPath });
   } catch (err) {
     console.error('Delete error:', err);
     res.status(500).json({
