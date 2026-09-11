@@ -36,14 +36,81 @@ async function createClient(credentials) {
   return client;
 }
 
+// Idle client pool for warm connection reuse with 20s TTL
+const clientPool = new Map(); // key -> Array<{ client, lastUsed }>
+const MAX_IDLE_PER_USER = 1; // 1 client per user to respect NAS connection limits
+const IDLE_TIMEOUT_MS = 20000; // 20 seconds idle timeout
+
+async function acquireClient(credentials) {
+  const key = credentials.user || config.FTPS_USER || 'default';
+  const pool = clientPool.get(key) || [];
+
+  while (pool.length > 0) {
+    const item = pool.pop();
+    if (!item.client.closed && Date.now() - item.lastUsed < IDLE_TIMEOUT_MS) {
+      try {
+        await item.client.send('NOOP');
+        return item.client;
+      } catch (err) {
+        try { item.client.close(); } catch (_) {}
+      }
+    } else {
+      try { item.client.close(); } catch (_) {}
+    }
+  }
+
+  return await createClient(credentials);
+}
+
+function releaseClient(credentials, client) {
+  if (!client || client.closed) return;
+  const key = credentials.user || config.FTPS_USER || 'default';
+  let pool = clientPool.get(key);
+  if (!pool) {
+    pool = [];
+    clientPool.set(key, pool);
+  }
+
+  if (pool.length < MAX_IDLE_PER_USER) {
+    pool.push({
+      client,
+      lastUsed: Date.now(),
+    });
+  } else {
+    try { client.close(); } catch (_) {}
+  }
+}
+
+// Background cleanup that disconnects idle connections after 20 seconds
+const poolCleaner = setInterval(() => {
+  const now = Date.now();
+  for (const [key, pool] of clientPool.entries()) {
+    const active = [];
+    for (const item of pool) {
+      if (!item.client.closed && now - item.lastUsed < IDLE_TIMEOUT_MS) {
+        active.push(item);
+      } else {
+        try { item.client.close(); } catch (_) {}
+      }
+    }
+    if (active.length > 0) {
+      clientPool.set(key, active);
+    } else {
+      clientPool.delete(key);
+    }
+  }
+}, 2000);
+
+if (poolCleaner.unref) poolCleaner.unref();
+
 /**
- * Executes an operation with a managed FTPS client that is always closed on completion,
+ * Executes an operation with a managed FTPS client (reusing warm connection when available),
  * with automatic retry and backoff if the FTPS server connection limit (421) is hit.
  */
 async function withClient(credentials, action, retries = 2) {
   let client;
   try {
-    client = await createClient(credentials);
+    client = await acquireClient(credentials);
     return await action(client);
   } catch (err) {
     const msg = String(err && (err.message || err.code || err));
@@ -55,15 +122,17 @@ async function withClient(credentials, action, retries = 2) {
     }
 
     // If hit by server's per-IP connection limit, wait briefly for other requests to finish and retry
-    if (retries > 0 && isLimitError) {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+    if (retries > 0) {
+      if (isLimitError) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       return withClient(credentials, action, retries - 1);
     }
 
     throw err;
   } finally {
     if (client) {
-      try { client.close(); } catch (_) {}
+      releaseClient(credentials, client);
     }
   }
 }
