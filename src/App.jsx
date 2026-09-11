@@ -62,15 +62,13 @@ export default function App() {
     return () => clearInterval(timer);
   }, [lastActivity]);
 
-  // Prefetch directory on hover
+  // Prefetch directory on hover (only when connection is already warm)
   const prefetch = useCallback((targetPath) => {
     if (!user || !targetPath) return;
+    // If connection is disconnected, do not reconnect on hover; wait for explicit click
+    if (connectionTtl === 0) return;
     if (clientDirCache.has(targetPath)) return;
     if (inflightPrefetches.has(targetPath)) return;
-
-    if (connectionTtl === 0) {
-      setIsReconnecting(true);
-    }
 
     const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -86,7 +84,6 @@ export default function App() {
       })
       .catch(() => {})
       .finally(() => {
-        setIsReconnecting(false);
         inflightPrefetches.delete(targetPath);
       });
 
@@ -97,13 +94,14 @@ export default function App() {
   const loadFiles = useCallback(async (targetPath = currentPath, isRefresh = false) => {
     if (!user) return;
 
+    if (connectionTtl === 0) {
+      setIsReconnecting(true);
+    }
+
     if (isRefresh) {
       // Forced refresh: clear client cache for this directory
       clientDirCache.delete(targetPath);
       setRefreshing(true);
-      if (connectionTtl === 0) {
-        setIsReconnecting(true);
-      }
     } else {
       // Instant SWR: if cached, render immediately (0 ms)
       const cached = clientDirCache.get(targetPath);
@@ -112,9 +110,6 @@ export default function App() {
         setCurrentPath(cached.currentPath || targetPath);
       } else {
         setLoadingFiles(true);
-        if (connectionTtl === 0) {
-          setIsReconnecting(true);
-        }
       }
     }
     setError(null);
