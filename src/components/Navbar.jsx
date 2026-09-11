@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Server, LogOut, RefreshCw, Shield, Lock } from 'lucide-react';
 
-export default function Navbar({ onRefresh, refreshing, connectionTtl }) {
+export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconnecting }) {
   const { user, logout, serverConfig } = useAuth();
 
   return (
@@ -28,23 +28,41 @@ export default function Navbar({ onRefresh, refreshing, connectionTtl }) {
 
         {/* Right: Actions & User profile */}
         <div className="flex items-center gap-2">
-          {/* TTL Countdown */}
+          {/* TTL Countdown & Connection status */}
           {connectionTtl !== undefined && (
             <div
               title={
-                connectionTtl > 0
+                isReconnecting
+                  ? 'Navazuji nové spojení k FTPS serveru (Reconnecting)...'
+                  : connectionTtl > 0
                   ? `Spojení k NAS serveru je aktivní. Po ${connectionTtl} s nečinnosti se automaticky odpojí.`
                   : 'Spojení k NAS serveru je odpojeno (neaktivní). Další akce se znovu připojí.'
               }
-              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800 text-xs font-mono select-none"
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-mono select-none transition-colors ${
+                isReconnecting
+                  ? 'bg-amber-950/40 border-amber-800/60'
+                  : 'bg-zinc-900/90 border-zinc-800'
+              }`}
             >
               <div
                 className={`w-1.5 h-1.5 rounded-full ${
-                  connectionTtl > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'
+                  isReconnecting
+                    ? 'bg-amber-400 animate-pulse'
+                    : connectionTtl > 0
+                    ? 'bg-emerald-400 animate-pulse'
+                    : 'bg-zinc-600'
                 }`}
               />
-              <span className={connectionTtl > 0 ? 'text-zinc-300' : 'text-zinc-500'}>
-                TTL: {connectionTtl}s
+              <span
+                className={
+                  isReconnecting
+                    ? 'text-amber-300 font-medium'
+                    : connectionTtl > 0
+                    ? 'text-zinc-300'
+                    : 'text-zinc-500'
+                }
+              >
+                {isReconnecting ? 'Reconnecting...' : `TTL: ${connectionTtl}s`}
               </span>
             </div>
           )}

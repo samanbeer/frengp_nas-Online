@@ -44,10 +44,12 @@ export default function App() {
   // Warm FTPS connection TTL countdown (20 seconds)
   const [connectionTtl, setConnectionTtl] = useState(20);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const resetConnectionTtl = useCallback(() => {
     setLastActivity(Date.now());
     setConnectionTtl(20);
+    setIsReconnecting(false);
   }, []);
 
   useEffect(() => {
@@ -66,6 +68,10 @@ export default function App() {
     if (clientDirCache.has(targetPath)) return;
     if (inflightPrefetches.has(targetPath)) return;
 
+    if (connectionTtl === 0) {
+      setIsReconnecting(true);
+    }
+
     const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -75,15 +81,17 @@ export default function App() {
             currentPath: data.currentPath || targetPath,
             timestamp: Date.now(),
           });
+          resetConnectionTtl();
         }
       })
       .catch(() => {})
       .finally(() => {
+        setIsReconnecting(false);
         inflightPrefetches.delete(targetPath);
       });
 
     inflightPrefetches.set(targetPath, req);
-  }, [user]);
+  }, [user, connectionTtl, resetConnectionTtl]);
 
   // Fetch files in directory with instant SWR and refresh support
   const loadFiles = useCallback(async (targetPath = currentPath, isRefresh = false) => {
@@ -93,6 +101,9 @@ export default function App() {
       // Forced refresh: clear client cache for this directory
       clientDirCache.delete(targetPath);
       setRefreshing(true);
+      if (connectionTtl === 0) {
+        setIsReconnecting(true);
+      }
     } else {
       // Instant SWR: if cached, render immediately (0 ms)
       const cached = clientDirCache.get(targetPath);
@@ -101,6 +112,9 @@ export default function App() {
         setCurrentPath(cached.currentPath || targetPath);
       } else {
         setLoadingFiles(true);
+        if (connectionTtl === 0) {
+          setIsReconnecting(true);
+        }
       }
     }
     setError(null);
@@ -142,10 +156,11 @@ export default function App() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setIsReconnecting(false);
       setLoadingFiles(false);
       setRefreshing(false);
     }
-  }, [user, currentPath, resetConnectionTtl]);
+  }, [user, currentPath, connectionTtl, resetConnectionTtl]);
 
   useEffect(() => {
     if (user) {
@@ -230,6 +245,7 @@ export default function App() {
         onRefresh={() => loadFiles(currentPath, true)}
         refreshing={refreshing}
         connectionTtl={connectionTtl}
+        isReconnecting={isReconnecting}
       />
 
       {/* Main Content Area */}
