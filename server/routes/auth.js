@@ -40,12 +40,9 @@ router.post('/login', loginLimiter, async (req, res) => {
       await testConnection({ user, password });
     } catch (ftpError) {
       console.error('FTPS login error:', ftpError.message || ftpError);
-      const isLimit = (ftpError.message || '').includes('421') || (ftpError.message || '').toLowerCase().includes('too many connections');
       return res.status(401).json({
-        error: isLimit
-          ? 'FTPS server hlásí příliš mnoho současných spojení. Počkejte prosím chvíli a zkuste to znovu.'
-          : 'Chyba přihlášení: Nesprávné heslo nebo nedostupný FTPS server.',
-        code: isLimit ? 'CONNECTION_LIMIT_EXCEEDED' : 'AUTH_FAILED',
+        error: 'Chyba přihlášení: Nesprávné heslo nebo nedostupný FTPS server.',
+        code: 'AUTH_FAILED',
         details: config.IS_PRODUCTION ? undefined : ftpError.message,
       });
     }

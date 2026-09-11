@@ -8,6 +8,7 @@ export default function FileList({
   items,
   onNavigate,
   onPreview,
+  onPrefetch,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -40,6 +41,7 @@ export default function FileList({
             <tr
               key={item.path}
               onClick={() => handleItemClick(item)}
+              onMouseEnter={() => item.isDirectory && onPrefetch && onPrefetch(item.path)}
               className="group hover:bg-zinc-800/40 transition-colors cursor-pointer select-none"
             >
               {/* Name & Icon */}

@@ -16,6 +16,7 @@ import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
 
 // Fast client-side cache for instant directory transitions
 const clientDirCache = new Map(); // path -> { items, currentPath, timestamp }
+const inflightPrefetches = new Map(); // path -> Promise
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
@@ -39,6 +40,31 @@ export default function App() {
   const [videoPreview, setVideoPreview] = useState(null);
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
+
+  // Prefetch directory on hover
+  const prefetch = useCallback((targetPath) => {
+    if (!user || !targetPath) return;
+    if (clientDirCache.has(targetPath)) return;
+    if (inflightPrefetches.has(targetPath)) return;
+
+    const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.items) {
+          clientDirCache.set(targetPath, {
+            items: data.items,
+            currentPath: data.currentPath || targetPath,
+            timestamp: Date.now(),
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        inflightPrefetches.delete(targetPath);
+      });
+
+    inflightPrefetches.set(targetPath, req);
+  }, [user]);
 
   // Fetch files in directory with instant SWR and refresh support
   const loadFiles = useCallback(async (targetPath = currentPath, isRefresh = false) => {
@@ -191,6 +217,7 @@ export default function App() {
         <Breadcrumbs
           currentPath={currentPath}
           onNavigate={(path) => loadFiles(path)}
+          onPrefetch={prefetch}
         />
 
         {/* Action Toolbar */}
@@ -241,12 +268,14 @@ export default function App() {
               items={filteredAndSortedItems}
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
+              onPrefetch={prefetch}
             />
           ) : (
             <FileGrid
               items={filteredAndSortedItems}
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
+              onPrefetch={prefetch}
             />
           )}
         </div>
