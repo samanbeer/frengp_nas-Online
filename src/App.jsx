@@ -41,6 +41,25 @@ export default function App() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
 
+  // Warm FTPS connection TTL countdown (20 seconds)
+  const [connectionTtl, setConnectionTtl] = useState(20);
+  const [lastActivity, setLastActivity] = useState(Date.now());
+
+  const resetConnectionTtl = useCallback(() => {
+    setLastActivity(Date.now());
+    setConnectionTtl(20);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - lastActivity) / 1000);
+      const remaining = Math.max(0, 20 - elapsed);
+      setConnectionTtl(remaining);
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [lastActivity]);
+
   // Prefetch directory on hover
   const prefetch = useCallback((targetPath) => {
     if (!user || !targetPath) return;
@@ -119,13 +138,14 @@ export default function App() {
 
       setItems(data.items || []);
       setCurrentPath(data.currentPath || targetPath);
+      resetConnectionTtl();
     } catch (err) {
       setError(err.message);
     } finally {
       setLoadingFiles(false);
       setRefreshing(false);
     }
-  }, [user, currentPath]);
+  }, [user, currentPath, resetConnectionTtl]);
 
   useEffect(() => {
     if (user) {
@@ -209,6 +229,7 @@ export default function App() {
       <Navbar
         onRefresh={() => loadFiles(currentPath, true)}
         refreshing={refreshing}
+        connectionTtl={connectionTtl}
       />
 
       {/* Main Content Area */}
