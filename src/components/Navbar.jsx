@@ -2,8 +2,11 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Server, LogOut, RefreshCw, Shield, Lock } from 'lucide-react';
 
-export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconnecting }) {
+export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconnecting, slotsStats }) {
   const { user, logout, serverConfig } = useAuth();
+
+  const effectivePercentage = Math.max(slotsStats?.percentage ?? 0, connectionTtl > 0 ? 20 : 0);
+  const effectiveSlots = Math.max(slotsStats?.usedSlots ?? 0, connectionTtl > 0 ? 1 : 0);
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-sm">
@@ -28,6 +31,34 @@ export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconne
 
         {/* Right: Actions & User profile */}
         <div className="flex items-center gap-2">
+          {/* Slots usage counter */}
+          {user && (
+            <div
+              title={`Využití FTPS slotů NAS serveru: ${effectiveSlots}/5 (${effectivePercentage} %). Limit je 5 souběžných spojení z webu.`}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-mono select-none transition-colors ${
+                effectivePercentage >= 80
+                  ? 'bg-rose-950/40 border-rose-800/60 text-rose-300'
+                  : effectivePercentage >= 60
+                  ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+                  : effectivePercentage > 0
+                  ? 'bg-zinc-900/90 border-zinc-800 text-zinc-300'
+                  : 'bg-zinc-900/90 border-zinc-800 text-zinc-500'
+              }`}
+            >
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${
+                  effectivePercentage >= 80
+                    ? 'bg-rose-400 animate-pulse'
+                    : effectivePercentage >= 60
+                    ? 'bg-amber-400'
+                    : effectivePercentage > 0
+                    ? 'bg-emerald-400'
+                    : 'bg-zinc-600'
+                }`}
+              />
+              <span>Sloty: {effectivePercentage} %</span>
+            </div>
+          )}
           {/* TTL Countdown & Connection status */}
           {connectionTtl !== undefined && (
             <div
