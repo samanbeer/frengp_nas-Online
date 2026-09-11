@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight, Folder, ArrowLeft, Copy, Check } from 'lucide-react';
 
-export default function Breadcrumbs({ currentPath, onNavigate, onPrefetch }) {
+export default function Breadcrumbs({ currentPath, onNavigate }) {
   const [copied, setCopied] = React.useState(false);
 
   const segments = currentPath === '/' ? [] : currentPath.split('/').filter(Boolean);
@@ -37,7 +37,6 @@ export default function Breadcrumbs({ currentPath, onNavigate, onPrefetch }) {
         {currentPath !== '/' && (
           <button
             onClick={navigateUp}
-            onMouseEnter={() => onPrefetch && onPrefetch(getParentPath())}
             className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors mr-1 cursor-pointer"
             title="O úroveň výše"
           >
@@ -48,7 +47,6 @@ export default function Breadcrumbs({ currentPath, onNavigate, onPrefetch }) {
         {/* Root button */}
         <button
           onClick={() => onNavigate('/')}
-          onMouseEnter={() => onPrefetch && onPrefetch('/')}
           className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors font-mono cursor-pointer ${
             currentPath === '/'
               ? 'text-zinc-100 bg-zinc-800 font-medium'
@@ -68,7 +66,6 @@ export default function Breadcrumbs({ currentPath, onNavigate, onPrefetch }) {
               <ChevronRight className="w-3 h-3 text-zinc-600 flex-shrink-0" />
               <button
                 onClick={() => navigateToSegment(index)}
-                onMouseEnter={() => !isLast && onPrefetch && onPrefetch(segPath)}
                 className={`px-2 py-1 rounded transition-colors truncate max-w-[200px] font-mono cursor-pointer ${
                   isLast
                     ? 'text-zinc-100 bg-zinc-800 font-medium'

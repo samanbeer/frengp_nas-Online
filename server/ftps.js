@@ -36,70 +36,39 @@ async function createClient(credentials) {
   return client;
 }
 
-// Idle client pool for warm connection reuse
-const clientPool = new Map(); // key -> Array<{ client, lastUsed }>
-const MAX_IDLE_PER_USER = 2;
-const IDLE_TIMEOUT_MS = 25000; // 25 seconds
-
-async function acquireClient(credentials) {
-  const key = credentials.user || config.FTPS_USER || 'default';
-  const pool = clientPool.get(key) || [];
-
-  while (pool.length > 0) {
-    const item = pool.pop();
-    if (!item.client.closed && Date.now() - item.lastUsed < IDLE_TIMEOUT_MS) {
-      try {
-        await item.client.send('NOOP');
-        return item.client;
-      } catch (err) {
-        try { item.client.close(); } catch (_) {}
-      }
-    } else {
-      try { item.client.close(); } catch (_) {}
-    }
-  }
-
-  return await createClient(credentials);
-}
-
-function releaseClient(credentials, client) {
-  if (!client || client.closed) return;
-  const key = credentials.user || config.FTPS_USER || 'default';
-  let pool = clientPool.get(key);
-  if (!pool) {
-    pool = [];
-    clientPool.set(key, pool);
-  }
-
-  if (pool.length < MAX_IDLE_PER_USER) {
-    pool.push({
-      client,
-      lastUsed: Date.now(),
-    });
-  } else {
-    try { client.close(); } catch (_) {}
-  }
-}
-
 /**
- * Executes an operation with a managed FTPS client (reusing warm connection when available).
+ * Executes an operation with a managed FTPS client.
+ * Always closes the connection immediately on finish to release the NAS IP connection limit.
+ * If NAS reports 421 (too many connections), it automatically retries after a brief delay.
  */
-async function withClient(credentials, action) {
-  let client;
-  try {
-    client = await acquireClient(credentials);
-    return await action(client);
-  } catch (err) {
-    // If command failed on a reused connection, retry once with a fresh client
-    if (client) {
-      try { client.close(); } catch (_) {}
-      client = null;
-    }
-    client = await createClient(credentials);
-    return await action(client);
-  } finally {
-    if (client) {
-      releaseClient(credentials, client);
+async function withClient(credentials, action, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let client;
+    try {
+      client = await createClient(credentials);
+      return await action(client);
+    } catch (err) {
+      if (client) {
+        try { client.close(); } catch (_) {}
+        client = null;
+      }
+
+      const msg = (err.message || '').toLowerCase();
+      const isConnectionLimit = msg.includes('421') || msg.includes('too many connections') || msg.includes('maximum connection');
+
+      if (isConnectionLimit && attempt < maxRetries) {
+        // Wait 750ms for other parallel requests to close their socket, then retry
+        await new Promise((resolve) => setTimeout(resolve, 750 * attempt));
+        continue;
+      }
+
+      throw err;
+    } finally {
+      if (client) {
+        try {
+          client.close();
+        } catch (_) {}
+      }
     }
   }
 }
