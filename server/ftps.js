@@ -37,38 +37,33 @@ async function createClient(credentials) {
 }
 
 /**
- * Executes an operation with a managed FTPS client.
- * Always closes the connection immediately on finish to release the NAS IP connection limit.
- * If NAS reports 421 (too many connections), it automatically retries after a brief delay.
+ * Executes an operation with a managed FTPS client that is always closed on completion,
+ * with automatic retry and backoff if the FTPS server connection limit (421) is hit.
  */
-async function withClient(credentials, action, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    let client;
-    try {
-      client = await createClient(credentials);
-      return await action(client);
-    } catch (err) {
-      if (client) {
-        try { client.close(); } catch (_) {}
-        client = null;
-      }
+async function withClient(credentials, action, retries = 2) {
+  let client;
+  try {
+    client = await createClient(credentials);
+    return await action(client);
+  } catch (err) {
+    const msg = String(err && (err.message || err.code || err));
+    const isLimitError = msg.includes('421') || msg.toLowerCase().includes('too many connections') || msg.toLowerCase().includes('connection limit');
 
-      const msg = (err.message || '').toLowerCase();
-      const isConnectionLimit = msg.includes('421') || msg.includes('too many connections') || msg.includes('maximum connection');
+    if (client) {
+      try { client.close(); } catch (_) {}
+      client = null;
+    }
 
-      if (isConnectionLimit && attempt < maxRetries) {
-        // Wait 750ms for other parallel requests to close their socket, then retry
-        await new Promise((resolve) => setTimeout(resolve, 750 * attempt));
-        continue;
-      }
+    // If hit by server's per-IP connection limit, wait briefly for other requests to finish and retry
+    if (retries > 0 && isLimitError) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return withClient(credentials, action, retries - 1);
+    }
 
-      throw err;
-    } finally {
-      if (client) {
-        try {
-          client.close();
-        } catch (_) {}
-      }
+    throw err;
+  } finally {
+    if (client) {
+      try { client.close(); } catch (_) {}
     }
   }
 }

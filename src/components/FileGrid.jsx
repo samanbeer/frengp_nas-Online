@@ -7,6 +7,7 @@ export default function FileGrid({
   items,
   onNavigate,
   onPreview,
+  onPrefetch,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -28,6 +29,7 @@ export default function FileGrid({
         <div
           key={item.path}
           onClick={() => handleItemClick(item)}
+          onMouseEnter={() => item.isDirectory && onPrefetch && onPrefetch(item.path)}
           className="group relative flex flex-col justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900 transition-colors cursor-pointer select-none"
         >
           {/* Top row */}
