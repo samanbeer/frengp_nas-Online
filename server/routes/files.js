@@ -55,6 +55,16 @@ function invalidateDirCache(user, targetPath) {
 }
 
 /**
+ * GET /api/files/status
+ * Returns current FTPS connection slot usage and capacity percentage
+ */
+router.get('/status', (req, res) => {
+  const stats = ftps.getConnectionStats();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(stats);
+});
+
+/**
  * GET /api/files/list
  * List directory contents (cached with TTL, bypassed on explicit refresh)
  */
@@ -70,7 +80,11 @@ router.get('/list', async (req, res) => {
       const cached = getCachedDir(user, cleanPath);
       if (cached) {
         res.setHeader('X-Cache', 'HIT');
-        return res.json(cached);
+        const stats = ftps.getConnectionStats();
+        return res.json({
+          ...cached,
+          stats,
+        });
       }
     }
 
@@ -78,8 +92,12 @@ router.get('/list', async (req, res) => {
     const result = await ftps.listDirectory(req.credentials, cleanPath);
     setCachedDir(user, cleanPath, result);
 
+    const stats = ftps.getConnectionStats();
     res.setHeader('X-Cache', isRefresh ? 'BYPASS' : 'MISS');
-    res.json(result);
+    res.json({
+      ...result,
+      stats,
+    });
   } catch (err) {
     console.error('List error:', err);
     res.status(500).json({
