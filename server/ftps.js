@@ -40,22 +40,6 @@ async function createClient(credentials) {
 const clientPool = new Map(); // key -> Array<{ client, lastUsed }>
 const MAX_IDLE_PER_USER = 1; // 1 client per user to respect NAS connection limits
 const IDLE_TIMEOUT_MS = 20000; // 20 seconds idle timeout
-const MAX_NAS_SLOTS = 5; // NAS per-IP connection limit
-let inUseClientsCount = 0;
-
-function getConnectionStats() {
-  let poolCount = 0;
-  for (const pool of clientPool.values()) {
-    poolCount += pool.length;
-  }
-  const usedSlots = Math.min(MAX_NAS_SLOTS, Math.max(0, inUseClientsCount + poolCount));
-  const percentage = Math.min(100, Math.round((usedSlots / MAX_NAS_SLOTS) * 100));
-  return {
-    usedSlots,
-    maxSlots: MAX_NAS_SLOTS,
-    percentage,
-  };
-}
 
 async function acquireClient(credentials) {
   const key = credentials.user || config.FTPS_USER || 'default';
@@ -125,7 +109,6 @@ if (poolCleaner.unref) poolCleaner.unref();
  */
 async function withClient(credentials, action, retries = 2) {
   let client;
-  inUseClientsCount++;
   try {
     client = await acquireClient(credentials);
     return await action(client);
@@ -148,7 +131,6 @@ async function withClient(credentials, action, retries = 2) {
 
     throw err;
   } finally {
-    inUseClientsCount = Math.max(0, inUseClientsCount - 1);
     if (client) {
       releaseClient(credentials, client);
     }
@@ -329,5 +311,4 @@ module.exports = {
   readTextFile,
   writeTextFile,
   getFileSize,
-  getConnectionStats,
 };
