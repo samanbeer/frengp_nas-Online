@@ -45,7 +45,6 @@ export default function App() {
   const [connectionTtl, setConnectionTtl] = useState(20);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [slotsStats, setSlotsStats] = useState({ usedSlots: 1, maxSlots: 5, percentage: 20 });
 
   const resetConnectionTtl = useCallback(() => {
     setLastActivity(Date.now());
@@ -63,25 +62,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, [lastActivity]);
 
-  // Periodically update FTPS slots usage
-  useEffect(() => {
-    if (!user) return;
-    const fetchStatus = () => {
-      fetch('/api/files/status')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data && typeof data.percentage === 'number') {
-            setSlotsStats(data);
-          }
-        })
-        .catch(() => {});
-    };
-
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 10000);
-    return () => clearInterval(interval);
-  }, [user]);
-
   // Prefetch directory on hover (only when connection is already warm)
   const prefetch = useCallback((targetPath) => {
     if (!user || !targetPath) return;
@@ -94,9 +74,6 @@ export default function App() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && data.items) {
-          if (data.stats) {
-            setSlotsStats(data.stats);
-          }
           clientDirCache.set(targetPath, {
             items: data.items,
             currentPath: data.currentPath || targetPath,
@@ -167,10 +144,6 @@ export default function App() {
         currentPath: data.currentPath || targetPath,
         timestamp: Date.now(),
       });
-
-      if (data.stats) {
-        setSlotsStats(data.stats);
-      }
 
       setItems(data.items || []);
       setCurrentPath(data.currentPath || targetPath);
@@ -268,7 +241,6 @@ export default function App() {
         refreshing={refreshing}
         connectionTtl={connectionTtl}
         isReconnecting={isReconnecting}
-        slotsStats={slotsStats}
       />
 
       {/* Main Content Area */}
