@@ -89,6 +89,30 @@ router.get('/list', async (req, res) => {
   }
 });
 
+
+/**
+ * GET /api/files/tree
+ * Recursively list all files in a directory tree for zip download
+ */
+router.get('/tree', async (req, res) => {
+  try {
+    const targetPath = req.query.path;
+    if (!targetPath) {
+      return res.status(400).json({ error: 'Chybí parametr path.' });
+    }
+
+    const cleanPath = ftps.normalizePath(targetPath);
+    const result = await ftps.getDirectoryTree(req.credentials, cleanPath);
+    res.json(result);
+  } catch (err) {
+    console.error('Tree error:', err);
+    res.status(500).json({
+      error: 'Nepodařilo se prohledat složku.',
+      details: err.message,
+    });
+  }
+});
+
 /**
  * GET /api/files/download
  * Download single file

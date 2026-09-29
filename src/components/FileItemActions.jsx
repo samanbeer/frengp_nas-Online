@@ -1,10 +1,22 @@
 import React from 'react';
-import { Download, Eye } from 'lucide-react';
+import { Download, Eye, FolderDown } from 'lucide-react';
 import { getFileCategory } from '../utils/formatters';
 
-export default function FileItemActions({ item, onPreview }) {
+export default function FileItemActions({ item, onPreview, onDownloadFolder }) {
   if (item.isDirectory) {
-    return null;
+    return (
+      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        {onDownloadFolder && (
+          <button
+            onClick={() => onDownloadFolder(item)}
+            className="p-1.5 rounded text-zinc-400 hover:text-blue-400 hover:bg-zinc-800 transition-colors cursor-pointer inline-flex items-center"
+            title="Stáhnout celou složku jako ZIP"
+          >
+            <FolderDown className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    );
   }
 
   const category = getFileCategory(item.name);
@@ -36,3 +48,4 @@ export default function FileItemActions({ item, onPreview }) {
     </div>
   );
 }
+

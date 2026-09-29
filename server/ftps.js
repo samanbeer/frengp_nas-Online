@@ -299,6 +299,55 @@ async function getFileSize(credentials, remotePath) {
   });
 }
 
+/**
+ * Recursively scans a directory tree and returns a list of all files with their relative paths and sizes.
+ */
+async function getDirectoryTree(credentials, targetPath = '/') {
+  const rootPath = normalizePath(targetPath);
+  return withClient(credentials, async (client) => {
+    const files = [];
+    const queue = [rootPath];
+
+    while (queue.length > 0) {
+      const currentDir = queue.shift();
+      const list = await client.list(currentDir);
+
+      for (const item of list) {
+        if (item.name === '.' || item.name === '..') continue;
+        const fullItemPath = currentDir === '/' ? `/${item.name}` : `${currentDir}/${item.name}`;
+        const isDirectory = item.isDirectory || item.type === 2;
+
+        if (isDirectory) {
+          queue.push(fullItemPath);
+        } else {
+          let rel = path.posix.relative(rootPath, fullItemPath);
+          if (rel.startsWith('/')) {
+            rel = rel.slice(1);
+          }
+          files.push({
+            name: item.name,
+            path: fullItemPath,
+            relativePath: rel || item.name,
+            size: item.size || 0,
+            modifiedAt: item.modifiedAt ? item.modifiedAt.toISOString() : null,
+          });
+        }
+      }
+    }
+
+    const totalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
+    const folderName = path.posix.basename(rootPath) || 'root';
+
+    return {
+      root: rootPath,
+      folderName,
+      totalFiles: files.length,
+      totalSize,
+      files,
+    };
+  });
+}
+
 module.exports = {
   normalizePath,
   testConnection,
@@ -311,4 +360,5 @@ module.exports = {
   readTextFile,
   writeTextFile,
   getFileSize,
+  getDirectoryTree,
 };
