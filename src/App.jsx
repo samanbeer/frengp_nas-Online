@@ -11,6 +11,8 @@ import AudioPreviewModal from './components/Modals/AudioPreviewModal';
 import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
+import ZipDownloadToast from './components/ZipDownloadToast';
+import { useFolderZipDownload } from './utils/useFolderZipDownload';
 import { getFileCategory, formatBytes, COMMIT_ID } from './utils/formatters';
 import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
 
@@ -40,6 +42,9 @@ export default function App() {
   const [videoPreview, setVideoPreview] = useState(null);
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
+
+  // Folder ZIP Download manager
+  const { downloadState, startDownload, cancelDownload, closeToast } = useFolderZipDownload();
 
   // Warm FTPS connection TTL countdown (20 seconds)
   const [connectionTtl, setConnectionTtl] = useState(20);
@@ -263,6 +268,13 @@ export default function App() {
           sortOrder={sortOrder}
           setSortOrder={setSortOrder}
           totalItems={filteredAndSortedItems.length}
+          onDownloadCurrentFolder={() => {
+            const folderName =
+              currentPath === '/'
+                ? 'root'
+                : currentPath.split('/').filter(Boolean).pop() || 'slozka';
+            startDownload(currentPath, folderName);
+          }}
         />
 
         {/* Error notification */}
@@ -301,6 +313,7 @@ export default function App() {
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
               onPrefetch={prefetch}
+              onDownloadFolder={(folder) => startDownload(folder.path, folder.name)}
             />
           ) : (
             <FileGrid
@@ -308,6 +321,7 @@ export default function App() {
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
               onPrefetch={prefetch}
+              onDownloadFolder={(folder) => startDownload(folder.path, folder.name)}
             />
           )}
         </div>
@@ -369,6 +383,13 @@ export default function App() {
         isOpen={Boolean(textViewerFile)}
         file={textViewerFile}
         onClose={() => setTextViewerFile(null)}
+      />
+
+      {/* Floating ZIP compression progress toast (bottom right) */}
+      <ZipDownloadToast
+        state={downloadState}
+        onCancel={cancelDownload}
+        onClose={closeToast}
       />
     </div>
   );

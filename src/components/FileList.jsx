@@ -9,6 +9,7 @@ export default function FileList({
   onNavigate,
   onPreview,
   onPrefetch,
+  onDownloadFolder,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -77,6 +78,7 @@ export default function FileList({
                 <FileItemActions
                   item={item}
                   onPreview={onPreview}
+                  onDownloadFolder={onDownloadFolder}
                 />
               </td>
             </tr>

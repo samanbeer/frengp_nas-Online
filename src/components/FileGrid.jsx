@@ -8,6 +8,7 @@ export default function FileGrid({
   onNavigate,
   onPreview,
   onPrefetch,
+  onDownloadFolder,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -41,6 +42,7 @@ export default function FileGrid({
               <FileItemActions
                 item={item}
                 onPreview={onPreview}
+                onDownloadFolder={onDownloadFolder}
               />
             </div>
           </div>
