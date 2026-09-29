@@ -7,7 +7,6 @@ import {
   ArrowUpAZ,
   X,
   FileText,
-  FolderDown,
 } from 'lucide-react';
 
 export default function Toolbar({
@@ -20,7 +19,6 @@ export default function Toolbar({
   sortOrder,
   setSortOrder,
   totalItems = 0,
-  onDownloadCurrentFolder,
 }) {
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -28,22 +26,11 @@ export default function Toolbar({
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
-      {/* Left: Count / Status & Download current folder */}
-      <div className="flex items-center gap-3">
+      {/* Left: Count / Status */}
+      <div className="flex items-center gap-2">
         <span className="text-xs text-zinc-400 font-mono">
           {totalItems} {totalItems === 1 ? 'položka' : totalItems >= 2 && totalItems <= 4 ? 'položky' : 'položek'}
         </span>
-
-        {onDownloadCurrentFolder && (
-          <button
-            onClick={onDownloadCurrentFolder}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 rounded-lg text-zinc-300 hover:text-white transition-colors cursor-pointer"
-            title="Stáhnout celou aktuální složku jako ZIP"
-          >
-            <FolderDown className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden sm:inline">Stáhnout složku (ZIP)</span>
-          </button>
-        )}
       </div>
 
       {/* Right: Search & View Controls */}
