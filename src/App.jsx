@@ -268,13 +268,6 @@ export default function App() {
           sortOrder={sortOrder}
           setSortOrder={setSortOrder}
           totalItems={filteredAndSortedItems.length}
-          onDownloadCurrentFolder={() => {
-            const folderName =
-              currentPath === '/'
-                ? 'root'
-                : currentPath.split('/').filter(Boolean).pop() || 'slozka';
-            startDownload(currentPath, folderName);
-          }}
         />
 
         {/* Error notification */}
