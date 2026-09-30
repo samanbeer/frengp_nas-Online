@@ -7,6 +7,7 @@ const fs = require('fs');
 const config = require('./config');
 const authRoutes = require('./routes/auth');
 const fileRoutes = require('./routes/files');
+const webhookRoutes = require('./routes/webhook');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api', apiLimiter);
 // API Endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
