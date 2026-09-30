@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Gauge,
 } from 'lucide-react';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 
@@ -123,18 +122,14 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
             />
           </div>
 
-          <div className="flex justify-between items-center text-[10px] font-mono text-zinc-500 pt-0.5">
-            <span>
-              {state.totalBytes > 0
-                ? `${formatBytes(state.processedBytes)} / ${formatBytes(state.totalBytes)}`
-                : ''}
-            </span>
-            {isWorking && state.speed > 0 && (
-              <span className="text-zinc-400">
-                Rychlost: <strong className="text-zinc-300">{formatSpeed(state.speed)}</strong>
+          {state.totalBytes > 0 && (
+            <div className="flex justify-between items-center text-[10px] font-mono text-zinc-500 pt-0.5">
+              <span>Velikost:</span>
+              <span>
+                {formatBytes(state.processedBytes)} / {formatBytes(state.totalBytes)}
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
