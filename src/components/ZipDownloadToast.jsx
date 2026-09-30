@@ -29,7 +29,7 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
         ? `Stahuji: ${state.currentFile}`
         : 'Stahuji soubory do mezipaměti...';
     } else {
-      statusText = 'Stahuji do mezipaměti prohlížeče...';
+      statusText = 'Stahování..';
     }
   } else if (state.phase === 'compressing') {
     statusText = 'Komprimuji data do ZIP archivu...';
