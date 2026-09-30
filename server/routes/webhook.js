@@ -35,12 +35,13 @@ function runDeploy() {
   const rootDir = path.resolve(__dirname, '../..');
   const logFile = '/home/ubuntu/deploy.log';
   const script = `
+    export PATH="/usr/local/bin:/usr/bin:/bin:${rootDir}/node_modules/.bin:$PATH"
     echo "=========================================" >> ${logFile}
     echo "🚀 Auto-deploy started: $(date)" >> ${logFile}
     cd ${rootDir}
     git fetch origin main >> ${logFile} 2>&1
     git reset --hard origin/main >> ${logFile} 2>&1
-    npm install >> ${logFile} 2>&1
+    npm install --include=dev >> ${logFile} 2>&1
     npm run build >> ${logFile} 2>&1
     echo "✅ Build completed successfully at $(date)" >> ${logFile}
     echo "🔄 Restarting nas-website service..." >> ${logFile}
