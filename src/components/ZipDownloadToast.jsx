@@ -99,7 +99,7 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
                 ? state.totalFiles > 0
                   ? `${state.processedFiles} z ${state.totalFiles} souborů`
                   : 'Příprava...'
-                : formatBytes(state.processedBytes)}
+                : ''}
             </span>
             <div className="flex items-center gap-2">
               {isWorking && state.speed > 0 && (
