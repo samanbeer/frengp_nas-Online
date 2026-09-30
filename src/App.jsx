@@ -140,7 +140,7 @@ export default function App() {
             return;
           }
         }
-        throw new Error(data.error || 'Nepodařilo se načíst soubory.');
+        throw new Error(data.error || 'Server je přetížený 😭.');
       }
 
       // Update client cache
