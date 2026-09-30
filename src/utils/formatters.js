@@ -11,6 +11,19 @@ export function formatBytes(bytes, decimals = 1) {
 }
 
 /**
+ * Format speed in bytes per second to human readable string (e.g. 8.5 MB/s, 420 KB/s)
+ */
+export function formatSpeed(bytesPerSec) {
+  if (!bytesPerSec || bytesPerSec <= 0) return '0 MB/s';
+  const mbps = bytesPerSec / (1024 * 1024);
+  if (mbps < 0.1) {
+    const kbps = bytesPerSec / 1024;
+    return `${kbps.toFixed(1)} KB/s`;
+  }
+  return `${mbps.toFixed(1)} MB/s`;
+}
+
+/**
  * Format ISO date string into Czech localized date/time
  */
 export function formatDate(dateString) {
