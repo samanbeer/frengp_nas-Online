@@ -1,0 +1,161 @@
+#!/bin/bash
+# ==============================================================================
+# Dynamic MOTD Status Script - FRENGP NAS Server (salat.fit)
+# Location: /etc/update-motd.d/99-nas-services
+# Fast execution (<1s) & Clean terminal output without emojis
+# ==============================================================================
+
+export LC_ALL=C.UTF-8
+
+BOLD="\033[1m"
+RESET="\033[0m"
+GREEN="\033[1;32m"
+RED="\033[1;31m"
+BOLD_RED="\033[1;31m"
+YELLOW="\033[1;33m"
+CYAN="\033[1;36m"
+WHITE="\033[1;37m"
+DIM="\033[2m"
+
+pad_str() {
+    local str="$1"
+    local target_len="$2"
+    local len=${#str}
+    local pad=$(( target_len - len ))
+    if [ $pad -lt 0 ]; then pad=0; fi
+    printf "%s%*s" "$str" "$pad" ""
+}
+
+printf "${CYAN}╔══════════════════════════════════════════════════════════════════════════╗${RESET}\n"
+printf "${CYAN}║${RESET} ${BOLD}${WHITE}            FRENGP | NAS ONLINE — PŘEHLED SLUŽEB SERVERU              ${RESET}${CYAN}║${RESET}\n"
+printf "${CYAN}╠══════════════════════════════════════════════════════════════════════════╣${RESET}\n"
+
+h1=$(pad_str "SLUŽBA" 36)
+h2=$(pad_str "STAV" 14)
+h3=$(pad_str "UPTIME / CÍL" 20)
+printf "${CYAN}║${RESET} ${BOLD}%s %s %s${RESET} ${CYAN}║${RESET}\n" "$h1" "$h2" "$h3"
+printf "${CYAN}╠══════════════════════════════════════════════════════════════════════════╣${RESET}\n"
+
+now_sec=$(date +%s)
+
+print_service_row() {
+    local service_name="$1"
+    local display_name="$2"
+    local port_info="$3"
+
+    local is_active=""
+    if [ "$service_name" = "ufw" ]; then
+        if sudo ufw status 2>/dev/null | grep -q "Status: active"; then
+            is_active="active"
+        fi
+    else
+        is_active=$(systemctl is-active "$service_name" 2>/dev/null)
+    fi
+
+    local name_with_port="$display_name"
+    if [ -n "$port_info" ]; then
+        name_with_port="$display_name $port_info"
+    fi
+
+    local padded_name=$(pad_str "$name_with_port" 36)
+
+    if [ "$is_active" = "active" ]; then
+        local uptime_str="Běží"
+        if [ "$service_name" != "ufw" ]; then
+            local timestamp=$(systemctl show "$service_name" --property=ActiveEnterTimestamp 2>/dev/null | cut -d= -f2)
+            if [ -n "$timestamp" ]; then
+                local start_sec=$(date -d "$timestamp" +%s 2>/dev/null)
+                if [ -n "$start_sec" ] && [ "$start_sec" -gt 0 ]; then
+                    local diff=$((now_sec - start_sec))
+                    local days=$((diff / 86400))
+                    local hours=$(( (diff % 86400) / 3600 ))
+                    local mins=$(( (diff % 3600) / 60 ))
+                    if [ $days -gt 0 ]; then
+                        uptime_str="${days}d ${hours}h ${mins}m"
+                    elif [ $hours -gt 0 ]; then
+                        uptime_str="${hours}h ${mins}m"
+                    else
+                        uptime_str="${mins}m"
+                    fi
+                fi
+            fi
+        else
+            uptime_str="Aktivní"
+        fi
+
+        local padded_status=$(pad_str "BĚŽÍ" 14)
+        local padded_uptime=$(pad_str "$uptime_str" 20)
+        printf "${CYAN}║${RESET} %s ${GREEN}%s${RESET} %s ${CYAN}║${RESET}\n" "$padded_name" "$padded_status" "$padded_uptime"
+    else
+        local padded_status=$(pad_str "ZASTAVENO" 14)
+        local padded_uptime=$(pad_str "Nedostupné" 20)
+        printf "${CYAN}║${RESET} %s ${RED}%s${RESET} %s ${CYAN}║${RESET}\n" "$padded_name" "$padded_status" "$padded_uptime"
+    fi
+}
+
+print_service_row "nas-website" "NAS Web Manager" "(port 5000)"
+print_service_row "cloudflared" "Cloudflare Tunnel" "(salat.fit)"
+print_service_row "ufw" "Firewall (UFW)" "(SSH only)"
+print_service_row "ssh" "OpenSSH Server" "(port 22)"
+
+# Check FTPS target connection (max 0.3s timeout)
+ftps_status="NEDOSTUPNÝ"
+ftps_color="${RED}"
+if timeout 0.3 bash -c "</dev/tcp/nas.frengp.cz/21" 2>/dev/null; then
+    ftps_status="DOSTUPNÝ"
+    ftps_color="${GREEN}"
+fi
+
+col1_ftps=$(pad_str "FTPS Cíl nas.frengp.cz" 36)
+col2_ftps=$(pad_str "$ftps_status" 14)
+col3_ftps=$(pad_str "port 21 TLS" 20)
+printf "${CYAN}║${RESET} %s ${ftps_color}%s${RESET} %s ${CYAN}║${RESET}\n" "$col1_ftps" "$col2_ftps" "$col3_ftps"
+
+printf "${CYAN}╠══════════════════════════════════════════════════════════════════════════╣${RESET}\n"
+
+load_avg=$(uptime | awk -F'load average:' '{ print $2 }' | xargs)
+mem_info=$(free -m | awk '/Mem:/ { printf "%dMB / %dMB (%.1f%%)", $3, $2, $3*100/$2 }')
+disk_info=$(df -h / | awk 'NR==2 { printf "%s / %s (%s)", $3, $2, $5 }')
+
+# Row: CPU & RAM
+c_left="CPU: ${load_avg}"
+c_right="RAM: ${mem_info}"
+c_pad_len=$(( 72 - ${#c_left} - ${#c_right} ))
+if [ $c_pad_len -lt 1 ]; then c_pad_len=1; fi
+c_pad=$(printf '%*s' "$c_pad_len" '')
+printf "${CYAN}║${RESET} ${DIM}CPU:${RESET} %s%s${DIM}RAM:${RESET} %s ${CYAN}║${RESET}\n" "$load_avg" "$c_pad" "$mem_info"
+
+# Row: Disk
+d_left="Disk (/): ${disk_info}"
+d_pad_len=$(( 72 - ${#d_left} ))
+if [ $d_pad_len -lt 1 ]; then d_pad_len=1; fi
+d_pad=$(printf '%*s' "$d_pad_len" '')
+printf "${CYAN}║${RESET} ${DIM}Disk (/):${RESET} %s%s ${CYAN}║${RESET}\n" "$disk_info" "$d_pad"
+
+printf "${CYAN}╠══════════════════════════════════════════════════════════════════════════╣${RESET}\n"
+
+# Poslední deploy
+last_deploy="Neznámo"
+if [ -f "/home/ubuntu/deploy.log" ]; then
+    last_deploy_line=$(grep "Build completed successfully" /home/ubuntu/deploy.log | tail -n 1)
+    if [ -n "$last_deploy_line" ]; then
+        last_deploy=$(echo "$last_deploy_line" | awk -F'at ' '{print $2}')
+    fi
+fi
+
+dep_left="Auto-Deploy: Aktivní (Webhook)"
+dep_right="Build: ${last_deploy}"
+dep_pad_len=$(( 72 - ${#dep_left} - ${#dep_right} ))
+if [ $dep_pad_len -lt 1 ]; then dep_pad_len=1; fi
+dep_pad=$(printf '%*s' "$dep_pad_len" '')
+
+printf "${CYAN}║${RESET} ${GREEN}Auto-Deploy:${RESET} Aktivní (Webhook)%s${DIM}Build:${RESET} %s ${CYAN}║${RESET}\n" "$dep_pad" "$last_deploy"
+printf "${CYAN}╚══════════════════════════════════════════════════════════════════════════╝${RESET}\n"
+printf "\n"
+printf "${BOLD_RED}ADMIN:${RESET} ${YELLOW}Tomáš Pachomov${RESET}  ${DIM}|${RESET}  ${CYAN}https://salat.fit${RESET}\n"
+printf "${DIM}Užitečné příkazy:${RESET}\n"
+printf "  1. ${BOLD}sudo /etc/update-motd.d/99-nas-services${RESET}  ${DIM}-- Znovu vykreslí tento dashboard${RESET}\n"
+printf "  2. ${BOLD}sudo journalctl -u nas-website -f${RESET}        ${DIM}-- Sledování živých logů webové aplikace${RESET}\n"
+printf "  3. ${BOLD}cat /home/ubuntu/deploy.log${RESET}              ${DIM}-- Zobrazení historie automatického nasazení${RESET}\n"
+printf "  4. ${BOLD}sudo systemctl restart nas-website${RESET}       ${DIM}-- Manuální restart NAS web manageru${RESET}\n"
+printf "  5. ${BOLD}sudo systemctl restart cloudflared${RESET}       ${DIM}-- Restart Cloudflare tunelu${RESET}\n\n"
