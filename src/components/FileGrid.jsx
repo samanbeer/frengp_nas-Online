@@ -9,6 +9,7 @@ export default function FileGrid({
   onPreview,
   onPrefetch,
   onDownloadFolder,
+  onDownloadFile,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -18,8 +19,12 @@ export default function FileGrid({
       if (['image', 'video', 'audio', 'pdf', 'code'].includes(category)) {
         onPreview(item);
       } else {
-        const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
-        window.open(url, '_blank');
+        if (onDownloadFile) {
+          onDownloadFile(item);
+        } else {
+          const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
+          window.open(url, '_blank');
+        }
       }
     }
   };
@@ -43,6 +48,7 @@ export default function FileGrid({
                 item={item}
                 onPreview={onPreview}
                 onDownloadFolder={onDownloadFolder}
+                onDownloadFile={onDownloadFile}
               />
             </div>
           </div>

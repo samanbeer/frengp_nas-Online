@@ -12,7 +12,7 @@ import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
 import ZipDownloadToast from './components/ZipDownloadToast';
-import { useFolderZipDownload } from './utils/useFolderZipDownload';
+import { useDownloadManager } from './utils/useDownloadManager';
 import { getFileCategory, formatBytes, COMMIT_ID } from './utils/formatters';
 import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
 
@@ -43,8 +43,14 @@ export default function App() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
 
-  // Folder ZIP Download manager
-  const { downloadState, startDownload, cancelDownload, closeToast } = useFolderZipDownload();
+  // In-browser Download Manager (files & folders with speed tracking)
+  const {
+    downloadState,
+    startFileDownload,
+    startFolderDownload,
+    cancelDownload,
+    closeToast,
+  } = useDownloadManager();
 
   // Warm FTPS connection TTL countdown (20 seconds)
   const [connectionTtl, setConnectionTtl] = useState(20);
@@ -218,8 +224,7 @@ export default function App() {
     else if (category === 'pdf') setPdfPreview(item);
     else if (category === 'code') setTextViewerFile(item);
     else {
-      const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
-      window.open(url, '_blank');
+      startFileDownload(item);
     }
   };
 
@@ -306,7 +311,8 @@ export default function App() {
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
               onPrefetch={prefetch}
-              onDownloadFolder={(folder) => startDownload(folder.path, folder.name)}
+              onDownloadFolder={startFolderDownload}
+              onDownloadFile={startFileDownload}
             />
           ) : (
             <FileGrid
@@ -314,7 +320,8 @@ export default function App() {
               onNavigate={(path) => loadFiles(path)}
               onPreview={handlePreview}
               onPrefetch={prefetch}
-              onDownloadFolder={(folder) => startDownload(folder.path, folder.name)}
+              onDownloadFolder={startFolderDownload}
+              onDownloadFile={startFileDownload}
             />
           )}
         </div>

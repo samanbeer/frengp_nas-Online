@@ -10,6 +10,7 @@ export default function FileList({
   onPreview,
   onPrefetch,
   onDownloadFolder,
+  onDownloadFile,
 }) {
   const handleItemClick = (item) => {
     if (item.isDirectory) {
@@ -19,8 +20,12 @@ export default function FileList({
       if (['image', 'video', 'audio', 'pdf', 'code'].includes(category)) {
         onPreview(item);
       } else {
-        const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
-        window.open(url, '_blank');
+        if (onDownloadFile) {
+          onDownloadFile(item);
+        } else {
+          const url = `/api/files/download?path=${encodeURIComponent(item.path)}`;
+          window.open(url, '_blank');
+        }
       }
     }
   };
@@ -79,6 +84,7 @@ export default function FileList({
                   item={item}
                   onPreview={onPreview}
                   onDownloadFolder={onDownloadFolder}
+                  onDownloadFile={onDownloadFile}
                 />
               </td>
             </tr>
