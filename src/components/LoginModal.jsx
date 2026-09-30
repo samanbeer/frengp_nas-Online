@@ -51,7 +51,7 @@ export default function LoginModal() {
               NAS Vyuka
             </h1>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Připojení k úložišti <span className="font-mono text-zinc-300">{serverConfig.host || 'nas.frengp.cz'}</span>
+              Připojení k školní NASce
             </p>
           </div>
 
@@ -59,7 +59,7 @@ export default function LoginModal() {
           <div className="mb-4 p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/40 text-blue-200 text-xs flex items-start gap-2">
             <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
             <div className="leading-snug text-[11px] text-blue-300">
-              Přihlašovací jméno a heslo jsou stejné jako při přihlašování zevnitř školy.
+              Přihlašovací jméno a heslo jsou stejné jako při přihlašování ve škole
             </div>
           </div>
 
