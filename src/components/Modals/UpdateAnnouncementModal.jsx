@@ -34,18 +34,18 @@ export default function UpdateAnnouncementModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="update-popup-title"
-        className="w-full max-w-sm rounded-xl p-5 border border-zinc-700/80 bg-zinc-900 shadow-2xl text-zinc-100"
+        className="w-full max-w-md rounded-xl p-6 border border-zinc-700/80 bg-zinc-900 shadow-2xl text-zinc-100"
       >
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 flex-shrink-0">
-            <Sparkles className="w-4 h-4" />
+        <div className="flex items-center gap-3 mb-3.5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 flex-shrink-0">
+            <Sparkles className="w-5 h-5" />
           </div>
-          <h2 id="update-popup-title" className="text-base font-semibold tracking-tight text-zinc-100">
+          <h2 id="update-popup-title" className="text-lg font-semibold tracking-tight text-zinc-100">
             Masivní Update! :O
           </h2>
         </div>
 
-        <p className="text-xs leading-relaxed text-zinc-300">
+        <p className="text-sm leading-relaxed text-zinc-300">
           salat.fit teď může naráz využívat moc moc moc lidí naráz! Taky tu je teď interaktivní
           fronta ať v případě přetížení víte, kdy na vás dojde řada!
         </p>
@@ -53,10 +53,10 @@ export default function UpdateAnnouncementModal() {
         <button
           type="button"
           onClick={handleDismiss}
-          className="w-full mt-4 py-2 px-3 bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+          className="w-full mt-5 py-2.5 px-4 bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-sm rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
         >
           <span>Kouknout na to</span>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
     </div>
