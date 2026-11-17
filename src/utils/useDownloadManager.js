@@ -1,13 +1,17 @@
 import { useState, useRef, useCallback } from 'react';
 import JSZip from 'jszip';
+import { useQueue } from '../context/QueueContext';
 
 export function useDownloadManager() {
+  const { requestDownloadSlot, cancelDownloadSlot } = useQueue();
+
   const [downloadState, setDownloadState] = useState({
     active: false,
     type: 'file', // 'file' | 'folder'
     name: '',
     path: '',
-    phase: 'idle', // 'idle' | 'scanning' | 'downloading' | 'compressing' | 'done' | 'error'
+    phase: 'idle', // 'idle' | 'queued' | 'scanning' | 'downloading' | 'compressing' | 'done' | 'error'
+    queuePosition: 0,
     percent: 0,
     speed: 0, // bytes per second
     processedBytes: 0,
@@ -25,16 +29,18 @@ export function useDownloadManager() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    cancelDownloadSlot();
     setDownloadState((prev) => ({
       ...prev,
       phase: 'error',
       speed: 0,
       error: 'Stahování bylo zrušeno uživatelem.',
     }));
-  }, []);
+  }, [cancelDownloadSlot]);
 
   const closeToast = useCallback(() => {
     if (
+      downloadState.phase === 'queued' ||
       downloadState.phase === 'downloading' ||
       downloadState.phase === 'scanning' ||
       downloadState.phase === 'compressing'
@@ -43,11 +49,12 @@ export function useDownloadManager() {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
+      cancelDownloadSlot();
     }
     setDownloadState((prev) => ({ ...prev, active: false, phase: 'idle', speed: 0 }));
-  }, [downloadState.phase]);
+  }, [downloadState.phase, cancelDownloadSlot]);
 
-  // Single file in-browser download with stream progress and speed tracking
+  // Single file in-browser download with queue slot acquisition and stream progress
   const startFileDownload = useCallback(async (item) => {
     if (!item) return;
 
@@ -65,6 +72,7 @@ export function useDownloadManager() {
       name: item.name,
       path: item.path,
       phase: 'downloading',
+      queuePosition: 0,
       percent: 0,
       speed: 0,
       processedBytes: 0,
@@ -76,12 +84,37 @@ export function useDownloadManager() {
     });
 
     try {
-      const res = await fetch(`/api/files/download?path=${encodeURIComponent(item.path)}`, {
+      // Acquire download slot (waits in queue if all 4 download slots are full)
+      await requestDownloadSlot({
+        name: item.name,
+        totalBytes: totalExpectedBytes,
+        type: 'file',
         signal: abortController.signal,
+        onQueued: (position) => {
+          setDownloadState((prev) => ({
+            ...prev,
+            phase: 'queued',
+            queuePosition: position,
+          }));
+        },
       });
 
+      if (abortController.signal.aborted) return;
+
+      setDownloadState((prev) => ({
+        ...prev,
+        phase: 'downloading',
+        queuePosition: 0,
+      }));
+
+      const res = await fetch(
+        `/api/files/download?path=${encodeURIComponent(item.path)}&size=${totalExpectedBytes}`,
+        { signal: abortController.signal }
+      );
+
       if (!res.ok) {
-        throw new Error('Nepodařilo se stáhnout soubor ze serveru.');
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Nepodařilo se stáhnout soubor ze serveru.');
       }
 
       const contentLength =
@@ -155,7 +188,6 @@ export function useDownloadManager() {
         speed: 0,
       }));
 
-      // Auto dismiss after 5s
       setTimeout(() => {
         setDownloadState((prev) =>
           prev.phase === 'done' ? { ...prev, active: false, phase: 'idle' } : prev
@@ -176,9 +208,9 @@ export function useDownloadManager() {
         abortControllerRef.current = null;
       }
     }
-  }, []);
+  }, [requestDownloadSlot]);
 
-  // Folder ZIP in-browser download with stream progress and speed tracking
+  // Folder ZIP in-browser download with queue slot acquisition and stream progress
   const startFolderDownload = useCallback(async (item) => {
     if (!item) return;
 
@@ -197,6 +229,7 @@ export function useDownloadManager() {
       name: `${name}.zip`,
       path: folderPath,
       phase: 'scanning',
+      queuePosition: 0,
       percent: 0,
       speed: 0,
       currentFile: '',
@@ -208,9 +241,32 @@ export function useDownloadManager() {
     });
 
     try {
-      // 1. Scan tree
+      // 1. Acquire download slot first (before scanning tree)
+      await requestDownloadSlot({
+        name: `${name}.zip`,
+        totalBytes: 0,
+        type: 'folder',
+        signal: abortController.signal,
+        onQueued: (position) => {
+          setDownloadState((prev) => ({
+            ...prev,
+            phase: 'queued',
+            queuePosition: position,
+          }));
+        },
+      });
+
+      if (abortController.signal.aborted) return;
+
+      setDownloadState((prev) => ({
+        ...prev,
+        phase: 'scanning',
+        queuePosition: 0,
+      }));
+
+      // 2. Scan tree inside the user's download slot
       const treeRes = await fetch(
-        `/api/files/tree?path=${encodeURIComponent(folderPath)}`,
+        `/api/files/tree?path=${encodeURIComponent(folderPath)}&download=1`,
         { signal: abortController.signal }
       );
 
@@ -223,6 +279,7 @@ export function useDownloadManager() {
 
       const tree = await treeRes.json();
       if (!tree.files || tree.files.length === 0) {
+        cancelDownloadSlot();
         setDownloadState((prev) => ({
           ...prev,
           phase: 'error',
@@ -240,7 +297,7 @@ export function useDownloadManager() {
         percent: 5,
       }));
 
-      // 2. Download each file with speed measurement
+      // 3. Download each file with speed measurement inside the same immune slot
       const zip = new JSZip();
       let totalReceivedAcrossFiles = 0;
       let lastTime = performance.now();
@@ -259,7 +316,7 @@ export function useDownloadManager() {
         }));
 
         const fileRes = await fetch(
-          `/api/files/download?path=${encodeURIComponent(file.path)}`,
+          `/api/files/download?path=${encodeURIComponent(file.path)}&size=${file.size || 0}&batch=1`,
           { signal: abortController.signal }
         );
 
@@ -298,7 +355,6 @@ export function useDownloadManager() {
               }));
             }
           }
-          // Combine chunks into ArrayBuffer
           const combined = new Uint8Array(
             chunks.reduce((acc, c) => acc + c.length, 0)
           );
@@ -326,7 +382,7 @@ export function useDownloadManager() {
         }));
       }
 
-      // 3. Compress ZIP
+      // 4. Compress ZIP in browser (server slot enters 7s grace)
       setDownloadState((prev) => ({
         ...prev,
         phase: 'compressing',
@@ -351,7 +407,7 @@ export function useDownloadManager() {
 
       if (abortController.signal.aborted) return;
 
-      // 4. Trigger download in browser
+      // 5. Trigger download in browser
       const downloadUrl = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = downloadUrl;
@@ -369,7 +425,6 @@ export function useDownloadManager() {
         speed: 0,
       }));
 
-      // Auto dismiss after 5s
       setTimeout(() => {
         setDownloadState((prev) =>
           prev.phase === 'done' ? { ...prev, active: false, phase: 'idle' } : prev
@@ -390,7 +445,7 @@ export function useDownloadManager() {
         abortControllerRef.current = null;
       }
     }
-  }, []);
+  }, [requestDownloadSlot, cancelDownloadSlot]);
 
   return {
     downloadState,

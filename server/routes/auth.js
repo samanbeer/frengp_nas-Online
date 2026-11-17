@@ -5,6 +5,8 @@ const { testConnection } = require('../ftps');
 const { createSession, destroySession } = require('../auth');
 const authMiddleware = require('../middleware/authMiddleware');
 const { loginLimiter } = require('../middleware/rateLimiter');
+const priorityStore = require('../priorityStore');
+const queueManager = require('../queueManager');
 
 // Public config: host & port only (no credentials leaked)
 router.get('/config', (req, res) => {
@@ -35,9 +37,11 @@ router.post('/login', loginLimiter, async (req, res) => {
       });
     }
 
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
+
     // Verify credentials directly with FTPS server
     try {
-      await testConnection({ user, password });
+      await testConnection({ user, password }, { clientId });
     } catch (ftpError) {
       console.error('FTPS login error:', ftpError.message || ftpError);
       return res.status(401).json({
@@ -80,6 +84,10 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 // Logout endpoint
 router.post('/logout', (req, res) => {
+  const clientId = priorityStore.getOrCreateQueueClientId(req, null);
+  if (clientId) {
+    queueManager.cancelDownloadSlot(clientId);
+  }
   const token = req.cookies && req.cookies.nas_session;
   if (token) {
     destroySession(token);

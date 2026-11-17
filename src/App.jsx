@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useQueue } from './context/QueueContext';
 import Navbar from './components/Navbar';
 import Breadcrumbs from './components/Breadcrumbs';
 import Toolbar from './components/Toolbar';
@@ -12,6 +13,7 @@ import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
 import ZipDownloadToast from './components/ZipDownloadToast';
+import QueueWidget from './components/QueueWidget';
 import { useDownloadManager } from './utils/useDownloadManager';
 import { getFileCategory, formatBytes, COMMIT_ID } from './utils/formatters';
 import { Loader2, FolderOpen, AlertCircle, Mail } from 'lucide-react';
@@ -22,6 +24,7 @@ const inflightPrefetches = new Map(); // path -> Promise
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const { queueState } = useQueue();
 
   // Navigation & Files state: default to '/Vyuka'
   const [currentPath, setCurrentPath] = useState('/Vyuka');
@@ -29,6 +32,7 @@ export default function App() {
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [activeBrowseId, setActiveBrowseId] = useState(null);
 
   // Filter & Display controls: default to 'list'
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +47,7 @@ export default function App() {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [textViewerFile, setTextViewerFile] = useState(null);
 
-  // In-browser Download Manager (files & folders with speed tracking)
+  // In-browser Download Manager (files & folders with queue + speed tracking)
   const {
     downloadState,
     startFileDownload,
@@ -52,39 +56,63 @@ export default function App() {
     closeToast,
   } = useDownloadManager();
 
-  // Warm FTPS connection TTL countdown (20 seconds)
+  // Warm FTPS connection TTL countdown (20s browse / 7s post-download grace)
   const [connectionTtl, setConnectionTtl] = useState(20);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const connectionTtlRef = useRef(20);
 
   const resetConnectionTtl = useCallback(() => {
     setLastActivity(Date.now());
     setConnectionTtl(20);
+    connectionTtlRef.current = 20;
     setIsReconnecting(false);
   }, []);
+
+  // Sync Navbar TTL when user's download finishes and enters 7s grace
+  useEffect(() => {
+    const yourSlot = queueState?.yourActiveSlot;
+    if (yourSlot && yourSlot.status === 'grace' && yourSlot.graceEndsAt) {
+      setLastActivity(yourSlot.graceEndsAt - 20000);
+    }
+  }, [queueState?.yourActiveSlot?.status, queueState?.yourActiveSlot?.graceEndsAt]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - lastActivity) / 1000);
       const remaining = Math.max(0, 20 - elapsed);
       setConnectionTtl(remaining);
+      connectionTtlRef.current = remaining;
     }, 500);
 
     return () => clearInterval(timer);
   }, [lastActivity]);
 
-  // Prefetch directory on hover (only when connection is already warm)
+  const isDownloadImmune = queueState?.yourActiveSlot?.status === 'downloading';
+
+  // Compute live browse queue position while waiting on an uncached directory
+  const currentBrowseEntry = useMemo(() => {
+    if (!activeBrowseId || !queueState?.browse?.items) return null;
+    return queueState.browse.items.find((item) => item.browseId === activeBrowseId) || null;
+  }, [activeBrowseId, queueState?.browse?.items]);
+
+  const browseAheadCount =
+    currentBrowseEntry && currentBrowseEntry.status === 'queued'
+      ? currentBrowseEntry.aheadCount
+      : 0;
+
+  // Prefetch directory on hover (debounced in FileList/FileGrid; only when warm)
   const prefetch = useCallback((targetPath) => {
     if (!user || !targetPath) return;
-    // If connection is disconnected, do not reconnect on hover; wait for explicit click
-    if (connectionTtl === 0) return;
+    if (targetPath.includes('#recycle') || targetPath.includes('@eaDir')) return;
+    if (connectionTtlRef.current === 0) return;
     if (clientDirCache.has(targetPath)) return;
     if (inflightPrefetches.has(targetPath)) return;
 
-    const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}`)
+    const req = fetch(`/api/files/list?path=${encodeURIComponent(targetPath)}&prefetch=1`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && data.items) {
+        if (data && !data.skipped && data.items) {
           clientDirCache.set(targetPath, {
             items: data.items,
             currentPath: data.currentPath || targetPath,
@@ -99,22 +127,20 @@ export default function App() {
       });
 
     inflightPrefetches.set(targetPath, req);
-  }, [user, connectionTtl, resetConnectionTtl]);
+  }, [user, resetConnectionTtl]);
 
-  // Fetch files in directory with instant SWR and refresh support
+  // Fetch files in directory with instant SWR, browse queue tracking, and refresh support
   const loadFiles = useCallback(async (targetPath = currentPath, isRefresh = false) => {
     if (!user) return;
 
-    if (connectionTtl === 0) {
+    if (connectionTtlRef.current === 0) {
       setIsReconnecting(true);
     }
 
     if (isRefresh) {
-      // Forced refresh: clear client cache for this directory
       clientDirCache.delete(targetPath);
       setRefreshing(true);
     } else {
-      // Instant SWR: if cached, render immediately (0 ms)
       const cached = clientDirCache.get(targetPath);
       if (cached) {
         setItems(cached.items || []);
@@ -125,15 +151,19 @@ export default function App() {
     }
     setError(null);
 
+    const browseId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setActiveBrowseId(browseId);
+
     try {
-      const url = `/api/files/list?path=${encodeURIComponent(targetPath)}${isRefresh ? '&refresh=true&_t=' + Date.now() : ''}`;
+      const url = `/api/files/list?path=${encodeURIComponent(targetPath)}&browseId=${encodeURIComponent(browseId)}${
+        isRefresh ? '&refresh=true&_t=' + Date.now() : ''
+      }`;
       const res = await fetch(url, { cache: isRefresh ? 'no-store' : 'default' });
       const data = await res.json();
 
       if (!res.ok) {
-        // If initial '/Vyuka' fails, try falling back to root '/'
         if (targetPath === '/Vyuka') {
-          const fallbackRes = await fetch('/api/files/list?path=/');
+          const fallbackRes = await fetch(`/api/files/list?path=/&browseId=${encodeURIComponent(browseId)}`);
           const fallbackData = await fallbackRes.json();
           if (fallbackRes.ok) {
             clientDirCache.set('/', {
@@ -143,13 +173,13 @@ export default function App() {
             });
             setItems(fallbackData.items || []);
             setCurrentPath('/');
+            resetConnectionTtl();
             return;
           }
         }
         throw new Error(data.error || 'Server je přetížený 😭.');
       }
 
-      // Update client cache
       clientDirCache.set(targetPath, {
         items: data.items || [],
         currentPath: data.currentPath || targetPath,
@@ -162,11 +192,12 @@ export default function App() {
     } catch (err) {
       setError(err.message);
     } finally {
+      setActiveBrowseId(null);
       setIsReconnecting(false);
       setLoadingFiles(false);
       setRefreshing(false);
     }
-  }, [user, currentPath, connectionTtl, resetConnectionTtl]);
+  }, [user, currentPath, resetConnectionTtl]);
 
   useEffect(() => {
     if (user) {
@@ -178,15 +209,12 @@ export default function App() {
   const filteredAndSortedItems = useMemo(() => {
     let result = [...items];
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((item) => item.name.toLowerCase().includes(q));
     }
 
-    // Sort
     result.sort((a, b) => {
-      // Folders always stay first
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
 
@@ -228,7 +256,6 @@ export default function App() {
     }
   };
 
-  // If still checking auth session
   if (authLoading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 gap-2">
@@ -238,7 +265,6 @@ export default function App() {
     );
   }
 
-  // If not logged in, render the login card
   if (!user) {
     return <LoginModal />;
   }
@@ -251,6 +277,7 @@ export default function App() {
         refreshing={refreshing}
         connectionTtl={connectionTtl}
         isReconnecting={isReconnecting}
+        isDownloadImmune={isDownloadImmune}
       />
 
       {/* Main Content Area */}
@@ -289,9 +316,24 @@ export default function App() {
         {/* File Browser List or Grid */}
         <div className="flex-1">
           {loadingFiles ? (
-            <div className="py-20 flex flex-col items-center justify-center text-zinc-500 gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
-              <span className="text-xs font-mono">Načítám soubory...</span>
+            <div className="py-20 flex flex-col items-center justify-center text-zinc-400 gap-2 text-center px-4">
+              <Loader2 className="w-6 h-6 animate-spin text-zinc-300" />
+              <span className="text-xs font-mono">
+                {browseAheadCount > 0
+                  ? `Fronta procházení: před tebou zpracovávám požadavek pro ${browseAheadCount} ${
+                      browseAheadCount === 1
+                        ? 'člověka'
+                        : browseAheadCount >= 2 && browseAheadCount <= 4
+                        ? 'lidi'
+                        : 'lidí'
+                    }...`
+                  : 'Načítám soubory...'}
+              </span>
+              {browseAheadCount > 0 && (
+                <span className="text-[11px] text-zinc-500">
+                  Složka se automaticky otevře, jakmile přijdeš na řadu.
+                </span>
+              )}
             </div>
           ) : filteredAndSortedItems.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center p-6 rounded-lg border border-zinc-800/80 bg-zinc-900/30">
@@ -359,38 +401,52 @@ export default function App() {
         isOpen={Boolean(imagePreview)}
         file={imagePreview}
         onClose={() => setImagePreview(null)}
+        onDownloadFile={startFileDownload}
       />
 
       <AudioPreviewModal
         isOpen={Boolean(audioPreview)}
         file={audioPreview}
         onClose={() => setAudioPreview(null)}
+        onDownloadFile={startFileDownload}
       />
 
       <VideoPreviewModal
         isOpen={Boolean(videoPreview)}
         file={videoPreview}
         onClose={() => setVideoPreview(null)}
+        onDownloadFile={startFileDownload}
       />
 
       <PdfPreviewModal
         isOpen={Boolean(pdfPreview)}
         file={pdfPreview}
         onClose={() => setPdfPreview(null)}
+        onDownloadFile={startFileDownload}
       />
 
       <TextViewerModal
         isOpen={Boolean(textViewerFile)}
         file={textViewerFile}
         onClose={() => setTextViewerFile(null)}
+        onDownloadFile={startFileDownload}
       />
 
-      {/* Floating ZIP compression progress toast (bottom right) */}
-      <ZipDownloadToast
-        state={downloadState}
-        onCancel={cancelDownload}
-        onClose={closeToast}
-      />
+      {/* Bottom-right floating stack: Download Toast above Interactive Queue Widget */}
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
+        <div className="pointer-events-auto">
+          <ZipDownloadToast
+            state={downloadState}
+            queuePosition={queueState?.yourWaitingTicket?.position}
+            hasPriority={Boolean(queueState?.yourWaitingTicket?.hasPriority)}
+            onCancel={cancelDownload}
+            onClose={closeToast}
+          />
+        </div>
+        <div className="pointer-events-auto">
+          <QueueWidget onCancelDownload={cancelDownload} />
+        </div>
+      </div>
     </div>
   );
 }

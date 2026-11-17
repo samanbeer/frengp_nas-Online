@@ -5,14 +5,18 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Clock,
+  Flame,
   X,
 } from 'lucide-react';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 
-export default function ZipDownloadToast({ state, onCancel, onClose }) {
+export default function ZipDownloadToast({ state, queuePosition = null, hasPriority = false, onCancel, onClose }) {
   if (!state.active) return null;
 
+  const isQueued = state.phase === 'queued';
   const isWorking =
+    isQueued ||
     state.phase === 'scanning' ||
     state.phase === 'downloading' ||
     state.phase === 'compressing';
@@ -21,7 +25,12 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
   const isFolder = state.type === 'folder';
 
   let statusText = '';
-  if (state.phase === 'scanning') {
+  if (isQueued) {
+    const pos = queuePosition || state.queuePosition || 1;
+    statusText = hasPriority
+      ? `Prioritní pozice #${pos} — čekám na uvolnění slotu...`
+      : `Ve frontě na pozici #${pos} — čekám na slot...`;
+  } else if (state.phase === 'scanning') {
     statusText = 'Prohledávám strukturu podsložek...';
   } else if (state.phase === 'downloading') {
     if (isFolder) {
@@ -45,7 +54,9 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-2rem)] max-w-sm sm:w-[380px] bg-zinc-900/95 backdrop-blur-md border border-zinc-700/80 rounded-xl shadow-2xl p-4 text-zinc-100 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5"
+      className={`w-[calc(100vw-2rem)] max-w-sm sm:w-[380px] bg-zinc-900/95 backdrop-blur-md border rounded-xl shadow-2xl p-4 text-zinc-100 transition-all duration-300 ${
+        isQueued && hasPriority ? 'priority-fire-row' : 'border-zinc-700/80'
+      }`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
@@ -56,10 +67,18 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
                 ? 'bg-emerald-500/20 text-emerald-400'
                 : isError
                 ? 'bg-red-500/20 text-red-400'
+                : isQueued && hasPriority
+                ? 'bg-orange-500/20 text-orange-400'
+                : isQueued
+                ? 'bg-amber-500/20 text-amber-400'
                 : 'bg-blue-500/20 text-blue-400'
             }`}
           >
-            {isWorking ? (
+            {isQueued && hasPriority ? (
+              <Flame className="w-4 h-4 priority-flame-icon" />
+            ) : isQueued ? (
+              <Clock className="w-4 h-4 animate-pulse" />
+            ) : isWorking ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : isDone ? (
               <CheckCircle2 className="w-4 h-4" />
@@ -91,7 +110,7 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
       </div>
 
       {/* Progress Bar & Details */}
-      {!isError && (
+      {!isError && !isQueued && (
         <div className="mt-3.5 space-y-1.5">
           <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
             <span>
@@ -140,7 +159,7 @@ export default function ZipDownloadToast({ state, onCancel, onClose }) {
             onClick={onCancel}
             className="text-[11px] font-medium text-zinc-400 hover:text-red-400 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-zinc-800"
           >
-            Zrušit stahování
+            {isQueued ? 'Opustit frontu' : 'Zrušit stahování'}
           </button>
         </div>
       )}

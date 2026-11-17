@@ -7,6 +7,7 @@ const multer = require('multer');
 const mime = require('mime-types');
 const authMiddleware = require('../middleware/authMiddleware');
 const ftps = require('../ftps');
+const priorityStore = require('../priorityStore');
 
 // Protect all file routes with authMiddleware
 router.use(authMiddleware);
@@ -24,8 +25,9 @@ const upload = multer({
   },
 });
 
-// Fast in-memory directory cache with TTL
+// Fast in-memory directory cache with TTL (shared per NAS account)
 const dirCache = new Map(); // key: `${user}:${cleanPath}` -> { data, timestamp }
+const inflightListings = new Map(); // key: `${user}:${cleanPath}` -> Promise
 const DIR_CACHE_TTL_MS = 20 * 1000; // 20 seconds TTL
 
 function getCachedDir(user, cleanPath) {
@@ -56,33 +58,69 @@ function invalidateDirCache(user, targetPath) {
 
 /**
  * GET /api/files/list
- * List directory contents (cached with TTL, bypassed on explicit refresh)
+ * List directory contents (shared cache with TTL, bypassed on explicit refresh)
  */
 router.get('/list', async (req, res) => {
   try {
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
     const targetPath = req.query.path || '/';
     const isRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const isPrefetch = req.query.prefetch === '1';
+    const browseId = typeof req.query.browseId === 'string' ? req.query.browseId : '';
     const cleanPath = ftps.normalizePath(targetPath);
     const user = req.credentials.user || 'default';
+    const cacheKey = `${user}:${cleanPath}`;
 
-    // If not a forced refresh, check fast in-memory cache
+    // If not a forced refresh, check fast shared in-memory cache
     if (!isRefresh) {
       const cached = getCachedDir(user, cleanPath);
       if (cached) {
         res.setHeader('X-Cache', 'HIT');
         return res.json(cached);
       }
+
+      // Coalesce identical concurrent non-refresh directory listings
+      if (inflightListings.has(cacheKey)) {
+        const result = await inflightListings.get(cacheKey);
+        if (result && result.skipped) {
+          return res.json({ skipped: true, currentPath: cleanPath, items: null });
+        }
+        res.setHeader('X-Cache', 'COALESCED');
+        return res.json(result);
+      }
     }
 
-    // Fetch fresh listing from FTPS server
-    const result = await ftps.listDirectory(req.credentials, cleanPath);
+    // Fetch fresh listing from FTPS server via browse queue
+    const listingPromise = ftps.listDirectory(req.credentials, cleanPath, {
+      clientId,
+      browseId,
+      isPrefetch,
+    });
+
+    if (!isRefresh && !isPrefetch) {
+      inflightListings.set(cacheKey, listingPromise);
+    }
+
+    let result;
+    try {
+      result = await listingPromise;
+    } finally {
+      if (inflightListings.get(cacheKey) === listingPromise) {
+        inflightListings.delete(cacheKey);
+      }
+    }
+
+    if (result && result.skipped) {
+      return res.json({ skipped: true, currentPath: cleanPath, items: null });
+    }
+
     setCachedDir(user, cleanPath, result);
 
     res.setHeader('X-Cache', isRefresh ? 'BYPASS' : 'MISS');
     res.json(result);
   } catch (err) {
     console.error('List error:', err);
-    res.status(500).json({
+    res.status(err.code === 550 ? 404 : 500).json({
       error: 'Nepodařilo se načíst obsah složky.',
       details: err.message,
     });
@@ -96,17 +134,22 @@ router.get('/list', async (req, res) => {
  */
 router.get('/tree', async (req, res) => {
   try {
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
     const targetPath = req.query.path;
     if (!targetPath) {
       return res.status(400).json({ error: 'Chybí parametr path.' });
     }
 
     const cleanPath = ftps.normalizePath(targetPath);
-    const result = await ftps.getDirectoryTree(req.credentials, cleanPath);
+    const isDownload = req.query.download === '1';
+    const result = await ftps.getDirectoryTree(req.credentials, cleanPath, {
+      clientId,
+      isDownload,
+    });
     res.json(result);
   } catch (err) {
     console.error('Tree error:', err);
-    res.status(500).json({
+    res.status(err.code === 'QUEUE_FULL' ? 429 : 500).json({
       error: 'Nepodařilo se prohledat složku.',
       details: err.message,
     });
@@ -115,10 +158,11 @@ router.get('/tree', async (req, res) => {
 
 /**
  * GET /api/files/download
- * Download single file
+ * Download single file via immune download slot
  */
 router.get('/download', async (req, res) => {
   try {
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
     const filePath = req.query.path;
     if (!filePath) {
       return res.status(400).json({ error: 'Chybí parametr path.' });
@@ -126,28 +170,46 @@ router.get('/download', async (req, res) => {
 
     const filename = path.posix.basename(filePath);
     const contentType = mime.lookup(filename) || 'application/octet-stream';
+    const totalBytes = parseInt(req.query.size, 10) || 0;
+    const isBatch = req.query.batch === '1';
 
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader('Content-Type', contentType);
-
-    await ftps.downloadFile(req.credentials, filePath, res);
+    await ftps.downloadFile(req.credentials, filePath, res, 0, {
+      clientId,
+      fileName: filename,
+      totalBytes,
+      isBatch,
+      onBeforeStream: (knownSize) => {
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        res.setHeader('Content-Type', contentType);
+        if (knownSize > 0) {
+          res.setHeader('Content-Length', knownSize);
+        }
+      },
+    });
   } catch (err) {
     console.error('Download error:', err);
     if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Nepodařilo se stáhnout soubor.',
+      const status = err.code === 'QUEUE_FULL' ? 429 : 500;
+      res.status(status).json({
+        error: err.code === 'QUEUE_FULL'
+          ? 'Všechny sloty pro stahování jsou obsazené. Použijte frontu v rozhraní.'
+          : 'Nepodařilo se stáhnout soubor.',
+        code: err.code,
         details: err.message,
       });
+    } else {
+      res.destroy();
     }
   }
 });
 
 /**
  * GET /api/files/preview
- * Stream preview (inline image, video, audio, pdf)
+ * Stream preview (inline image, video, audio, pdf with HTTP Range support)
  */
 router.get('/preview', async (req, res) => {
   try {
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
     const filePath = req.query.path;
     if (!filePath) {
       return res.status(400).json({ error: 'Chybí parametr path.' });
@@ -156,11 +218,9 @@ router.get('/preview', async (req, res) => {
     const filename = path.posix.basename(filePath);
     const contentType = mime.lookup(filename) || 'application/octet-stream';
 
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-
-    await ftps.downloadFile(req.credentials, filePath, res);
+    await ftps.streamPreview(req.credentials, filePath, req, res, contentType, filename, {
+      clientId,
+    });
   } catch (err) {
     console.error('Preview error:', err);
     if (!res.headersSent) {
@@ -168,6 +228,8 @@ router.get('/preview', async (req, res) => {
         error: 'Nepodařilo se načíst náhled souboru.',
         details: err.message,
       });
+    } else {
+      res.destroy();
     }
   }
 });
@@ -341,12 +403,15 @@ router.delete('/delete', async (req, res) => {
  */
 router.get('/read-text', async (req, res) => {
   try {
+    const clientId = priorityStore.getOrCreateQueueClientId(req, res);
     const filePath = req.query.path;
     if (!filePath) {
       return res.status(400).json({ error: 'Chybí parametr path.' });
     }
 
-    const content = await ftps.readTextFile(req.credentials, filePath);
+    const content = await ftps.readTextFile(req.credentials, filePath, 5 * 1024 * 1024, {
+      clientId,
+    });
     res.json({ success: true, path: filePath, content });
   } catch (err) {
     console.error('Read text error:', err);

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCw, Download } from 'lucide-react';
 import { formatBytes } from '../../utils/formatters';
 
-export default function ImagePreviewModal({ isOpen, onClose, file }) {
+export default function ImagePreviewModal({ isOpen, onClose, file, onDownloadFile }) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
@@ -60,14 +60,25 @@ export default function ImagePreviewModal({ isOpen, onClose, file }) {
             100%
           </button>
           <div className="w-px h-3.5 bg-zinc-800 my-auto mx-1" />
-          <a
-            href={downloadUrl}
-            download
-            className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors inline-flex items-center"
-            title="Stáhnout obrázek"
-          >
-            <Download className="w-3.5 h-3.5" />
-          </a>
+          {onDownloadFile ? (
+            <button
+              type="button"
+              onClick={() => onDownloadFile(file)}
+              className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors inline-flex items-center cursor-pointer"
+              title="Stáhnout obrázek"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <a
+              href={downloadUrl}
+              download
+              className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors inline-flex items-center"
+              title="Stáhnout obrázek"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </a>
+          )}
           <button
             onClick={onClose}
             className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors ml-1"

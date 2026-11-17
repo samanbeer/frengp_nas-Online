@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, X, Download, Copy, Check, Loader2, AlertCircle } from 'lucide-react';
 import { formatBytes } from '../../utils/formatters';
 
-export default function TextViewerModal({ isOpen, onClose, file }) {
+export default function TextViewerModal({ isOpen, onClose, file, onDownloadFile }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,15 +60,27 @@ export default function TextViewerModal({ isOpen, onClose, file }) {
               <span>{copied ? 'Zkopírováno' : 'Kopírovat'}</span>
             </button>
 
-            <a
-              href={downloadUrl}
-              download
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/60 flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Stáhnout soubor"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Stáhnout</span>
-            </a>
+            {onDownloadFile ? (
+              <button
+                type="button"
+                onClick={() => onDownloadFile(file)}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/60 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Stáhnout soubor"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Stáhnout</span>
+              </button>
+            ) : (
+              <a
+                href={downloadUrl}
+                download
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/60 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Stáhnout soubor"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Stáhnout</span>
+              </a>
+            )}
 
             <button
               onClick={onClose}

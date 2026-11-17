@@ -2,7 +2,13 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Server, LogOut, RefreshCw, Shield, Lock } from 'lucide-react';
 
-export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconnecting }) {
+export default function Navbar({
+  onRefresh,
+  refreshing,
+  connectionTtl,
+  isReconnecting,
+  isDownloadImmune = false,
+}) {
   const { user, logout, serverConfig } = useAuth();
 
   return (
@@ -34,6 +40,8 @@ export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconne
               title={
                 isReconnecting
                   ? 'Navazuji nové spojení k FTPS serveru (Reconnecting)...'
+                  : isDownloadImmune
+                  ? 'Probíhá stahování (spojení má imunitu proti odpojení).'
                   : connectionTtl > 0
                   ? `Spojení k NAS serveru je aktivní. Po ${connectionTtl} s nečinnosti se automaticky odpojí.`
                   : 'Spojení k NAS serveru je odpojeno (neaktivní). Další akce se znovu připojí.'
@@ -48,7 +56,7 @@ export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconne
                 className={`w-1.5 h-1.5 rounded-full ${
                   isReconnecting
                     ? 'bg-amber-400 animate-pulse'
-                    : connectionTtl > 0
+                    : isDownloadImmune || connectionTtl > 0
                     ? 'bg-emerald-400 animate-pulse'
                     : 'bg-zinc-600'
                 }`}
@@ -57,12 +65,16 @@ export default function Navbar({ onRefresh, refreshing, connectionTtl, isReconne
                 className={
                   isReconnecting
                     ? 'text-amber-300 font-medium'
-                    : connectionTtl > 0
+                    : isDownloadImmune || connectionTtl > 0
                     ? 'text-zinc-300'
                     : 'text-zinc-500'
                 }
               >
-                {isReconnecting ? 'Reconnecting...' : `TTL: ${connectionTtl}s`}
+                {isReconnecting
+                  ? 'Reconnecting...'
+                  : isDownloadImmune
+                  ? 'Aktivní'
+                  : `TTL: ${connectionTtl}s`}
               </span>
             </div>
           )}

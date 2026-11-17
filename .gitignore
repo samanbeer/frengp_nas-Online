@@ -17,6 +17,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Persistent runtime data (kept across auto-deploys)
+server/data/
+
 # System files
 .DS_Store
 Thumbs.db

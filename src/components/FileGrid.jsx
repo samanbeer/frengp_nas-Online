@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { getFileIcon } from '../utils/fileIcons';
 import { formatBytes, getFileCategory } from '../utils/formatters';
 import FileItemActions from './FileItemActions';
@@ -11,6 +11,29 @@ export default function FileGrid({
   onDownloadFolder,
   onDownloadFile,
 }) {
+  const hoverTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
+
+  const handleMouseEnterFolder = (path) => {
+    if (!onPrefetch) return;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      onPrefetch(path);
+    }, 200);
+  };
+
+  const handleMouseLeaveFolder = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
   const handleItemClick = (item) => {
     if (item.isDirectory) {
       onNavigate(item.path);
@@ -35,7 +58,8 @@ export default function FileGrid({
         <div
           key={item.path}
           onClick={() => handleItemClick(item)}
-          onMouseEnter={() => item.isDirectory && onPrefetch && onPrefetch(item.path)}
+          onMouseEnter={() => item.isDirectory && handleMouseEnterFolder(item.path)}
+          onMouseLeave={() => item.isDirectory && handleMouseLeaveFolder()}
           className="group relative flex flex-col justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900 transition-colors cursor-pointer select-none"
         >
           {/* Top row */}

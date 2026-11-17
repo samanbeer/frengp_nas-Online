@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { getFileIcon } from '../utils/fileIcons';
 import { formatBytes, formatDate, getFileCategory } from '../utils/formatters';
 import FileItemActions from './FileItemActions';
-import { Folder } from 'lucide-react';
 
 export default function FileList({
   items,
@@ -12,6 +11,29 @@ export default function FileList({
   onDownloadFolder,
   onDownloadFile,
 }) {
+  const hoverTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
+
+  const handleMouseEnterFolder = (path) => {
+    if (!onPrefetch) return;
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      onPrefetch(path);
+    }, 200);
+  };
+
+  const handleMouseLeaveFolder = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
   const handleItemClick = (item) => {
     if (item.isDirectory) {
       onNavigate(item.path);
@@ -47,7 +69,8 @@ export default function FileList({
             <tr
               key={item.path}
               onClick={() => handleItemClick(item)}
-              onMouseEnter={() => item.isDirectory && onPrefetch && onPrefetch(item.path)}
+              onMouseEnter={() => item.isDirectory && handleMouseEnterFolder(item.path)}
+              onMouseLeave={() => item.isDirectory && handleMouseLeaveFolder()}
               className="group hover:bg-zinc-800/40 transition-colors cursor-pointer select-none"
             >
               {/* Name & Icon */}

@@ -70,6 +70,17 @@ export function getFileCategory(filename = '') {
 }
 
 /**
+ * Format ETA in seconds to human readable string (e.g. ~42 s, ~2m 15s)
+ */
+export function formatEta(seconds) {
+  if (!seconds || seconds <= 0) return null;
+  if (seconds < 60) return `~${seconds} s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `~${mins}m ${secs}s` : `~${mins}m`;
+}
+
+/**
  * Injected at build time via Vite define (__COMMIT_HASH__)
  */
 export const COMMIT_ID = typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : '';

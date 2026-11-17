@@ -13,9 +13,10 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minut
-  max: 600, // 600 requestů za 5 minut
+  max: 3000, // dostatečný limit i pro celou školní učebnu za jednou veřejnou IP
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/queue/stream',
   message: {
     error: 'Příliš mnoho požadavků. Počkejte prosím chvíli.',
     code: 'API_RATE_LIMIT',

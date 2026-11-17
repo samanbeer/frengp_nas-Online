@@ -2,7 +2,7 @@ import React from 'react';
 import { Music, X, Download } from 'lucide-react';
 import { formatBytes } from '../../utils/formatters';
 
-export default function AudioPreviewModal({ isOpen, onClose, file }) {
+export default function AudioPreviewModal({ isOpen, onClose, file, onDownloadFile }) {
   if (!isOpen || !file) return null;
 
   const streamUrl = `/api/files/preview?path=${encodeURIComponent(file.path)}`;
@@ -37,14 +37,25 @@ export default function AudioPreviewModal({ isOpen, onClose, file }) {
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
-          <a
-            href={downloadUrl}
-            download
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 inline-flex items-center gap-1.5 transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Stáhnout</span>
-          </a>
+          {onDownloadFile ? (
+            <button
+              type="button"
+              onClick={() => onDownloadFile(file)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Stáhnout</span>
+            </button>
+          ) : (
+            <a
+              href={downloadUrl}
+              download
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 inline-flex items-center gap-1.5 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Stáhnout</span>
+            </a>
+          )}
         </div>
       </div>
     </div>

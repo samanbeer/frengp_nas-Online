@@ -33,4 +33,66 @@
   border: 1px solid #27272a;
 }
 
+/* Priority queue fire effect */
+@keyframes fireGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(249, 115, 22, 0.35),
+      inset 0 0 10px rgba(239, 68, 68, 0.14);
+    border-color: rgba(249, 115, 22, 0.65);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(251, 146, 60, 0.55),
+      inset 0 0 14px rgba(245, 158, 11, 0.22);
+    border-color: rgba(251, 191, 36, 0.85);
+  }
+}
+
+@keyframes fireShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes flameFlicker {
+  0%, 100% {
+    transform: scale(1) rotate(-3deg);
+    filter: drop-shadow(0 0 4px rgba(251, 146, 60, 0.8));
+  }
+  35% {
+    transform: scale(1.14) rotate(4deg);
+    filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.95));
+  }
+  70% {
+    transform: scale(0.96) rotate(-2deg);
+    filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.85));
+  }
+}
+
+.priority-fire-row {
+  position: relative;
+  background: linear-gradient(
+    110deg,
+    rgba(124, 45, 18, 0.38) 0%,
+    rgba(180, 83, 9, 0.28) 35%,
+    rgba(153, 27, 27, 0.34) 70%,
+    rgba(124, 45, 18, 0.38) 100%
+  );
+  background-size: 220% 220%;
+  border: 1px solid rgba(249, 115, 22, 0.65);
+  animation: fireGlow 1.8s ease-in-out infinite, fireShimmer 3.2s ease infinite;
+}
+
+.priority-flame-icon {
+  animation: flameFlicker 1.1s ease-in-out infinite;
+}
+
+
 

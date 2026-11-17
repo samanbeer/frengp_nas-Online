@@ -2,7 +2,7 @@ import React from 'react';
 import { FileText, X, Download } from 'lucide-react';
 import { formatBytes } from '../../utils/formatters';
 
-export default function PdfPreviewModal({ isOpen, onClose, file }) {
+export default function PdfPreviewModal({ isOpen, onClose, file, onDownloadFile }) {
   if (!isOpen || !file) return null;
 
   const streamUrl = `/api/files/preview?path=${encodeURIComponent(file.path)}`;
@@ -20,14 +20,25 @@ export default function PdfPreviewModal({ isOpen, onClose, file }) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <a
-            href={downloadUrl}
-            download
-            className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors inline-flex items-center gap-1 text-xs"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Stáhnout PDF</span>
-          </a>
+          {onDownloadFile ? (
+            <button
+              type="button"
+              onClick={() => onDownloadFile(file)}
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors inline-flex items-center gap-1 text-xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Stáhnout PDF</span>
+            </button>
+          ) : (
+            <a
+              href={downloadUrl}
+              download
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors inline-flex items-center gap-1 text-xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Stáhnout PDF</span>
+            </a>
+          )}
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
