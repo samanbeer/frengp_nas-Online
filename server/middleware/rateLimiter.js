@@ -2,7 +2,8 @@ const rateLimit = require('express-rate-limit');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minut
-  max: 20, // max 20 pokusů o přihlášení z jedné IP za 15 minut
+  max: 20, // max 20 neúspěšných pokusů o přihlášení z jedné IP za 15 minut
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

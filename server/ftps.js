@@ -105,7 +105,7 @@ async function downloadFile(credentials, remotePath, res, startOffset = 0, meta 
       totalBytes,
       isBatch,
     },
-    async (client, { addChunkBytes, abortEntry }) => {
+    async (client, { addChunkBytes, setKnownSize, abortEntry }) => {
       let knownSize = totalBytes;
       if (!knownSize) {
         try {
@@ -113,6 +113,10 @@ async function downloadFile(credentials, remotePath, res, startOffset = 0, meta 
         } catch (_) {
           knownSize = 0;
         }
+      }
+
+      if (knownSize > 0) {
+        setKnownSize(knownSize);
       }
 
       if (onBeforeStream) {

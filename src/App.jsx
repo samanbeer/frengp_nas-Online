@@ -12,6 +12,7 @@ import AudioPreviewModal from './components/Modals/AudioPreviewModal';
 import VideoPreviewModal from './components/Modals/VideoPreviewModal';
 import PdfPreviewModal from './components/Modals/PdfPreviewModal';
 import TextViewerModal from './components/Modals/TextViewerModal';
+import UpdateAnnouncementModal from './components/Modals/UpdateAnnouncementModal';
 import ZipDownloadToast from './components/ZipDownloadToast';
 import QueueWidget from './components/QueueWidget';
 import { useDownloadManager } from './utils/useDownloadManager';
@@ -431,6 +432,8 @@ export default function App() {
         onClose={() => setTextViewerFile(null)}
         onDownloadFile={startFileDownload}
       />
+
+      <UpdateAnnouncementModal />
 
       {/* Bottom-right floating stack: Download Toast above Interactive Queue Widget */}
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">

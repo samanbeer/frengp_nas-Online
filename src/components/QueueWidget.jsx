@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
-import { formatEta, formatSpeed } from '../utils/formatters';
+import { formatEta } from '../utils/formatters';
 
 export default function QueueWidget({ onCancelDownload }) {
   const { queueState, priorityQuota, usePriority, cancelDownloadSlot } = useQueue();
@@ -126,11 +126,19 @@ export default function QueueWidget({ onCancelDownload }) {
                     ? Math.max(0, Math.ceil((entry.graceEndsAt - now) / 1000))
                     : entry.graceRemainingSeconds;
                 const etaStr = formatEta(entry.etaSeconds);
+                const hasPercent = typeof entry.percent === 'number';
+
+                let statusSubtitle = 'Připravuje stahování…';
+                if (entry.status === 'downloading') {
+                  statusSubtitle = entry.isYou ? 'Stahuješ' : 'Něco stahuje';
+                } else if (entry.status === 'grace') {
+                  statusSubtitle = 'Dokončeno';
+                }
 
                 return (
                   <div
                     key={`active-${entry.slot}-${entry.label}`}
-                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs border ${
+                    className={`rounded-lg text-xs border overflow-hidden ${
                       entry.hasPriority
                         ? 'priority-fire-row'
                         : entry.isYou
@@ -138,58 +146,68 @@ export default function QueueWidget({ onCancelDownload }) {
                         : 'bg-zinc-950/60 border-zinc-800/80 text-zinc-300'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {entry.hasPriority ? (
-                        <Flame className="w-3.5 h-3.5 text-orange-400 priority-flame-icon flex-shrink-0" />
-                      ) : (
-                        <Download
-                          className={`w-3.5 h-3.5 flex-shrink-0 ${
-                            entry.status === 'downloading'
-                              ? 'text-emerald-400 animate-pulse'
-                              : 'text-amber-400'
-                          }`}
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`font-medium truncate ${entry.isYou ? 'text-blue-300' : 'text-zinc-200'}`}>
-                            {entry.label}
-                          </span>
-                          {entry.hasPriority && (
-                            <span className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40">
-                              PRIORITA
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {entry.hasPriority ? (
+                          <Flame className="w-3.5 h-3.5 text-orange-400 priority-flame-icon flex-shrink-0" />
+                        ) : (
+                          <Download
+                            className={`w-3.5 h-3.5 flex-shrink-0 ${
+                              entry.status === 'downloading'
+                                ? 'text-emerald-400 animate-pulse'
+                                : 'text-amber-400'
+                            }`}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-medium truncate ${entry.isYou ? 'text-blue-300' : 'text-zinc-200'}`}>
+                              {entry.label}
                             </span>
-                          )}
+                            {entry.hasPriority && (
+                              <span className="text-[9px] font-mono font-semibold px-1 rounded bg-orange-500/20 text-orange-300 border border-orange-500/40">
+                                PRIORITA
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-500">{statusSubtitle}</div>
                         </div>
-                        <div className="text-[10px] text-zinc-500 truncate max-w-[165px]" title={entry.fileName}>
-                          {entry.fileName}
-                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0 font-mono text-[11px]">
+                        {entry.status === 'downloading' ? (
+                          <div className="flex items-center gap-1.5 text-emerald-400" title="Aktivní stahování (imunita)">
+                            <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>
+                              {hasPercent ? `${entry.percent} %` : '…'}
+                              {etaStr ? ` • ${etaStr}` : ''}
+                            </span>
+                          </div>
+                        ) : entry.status === 'grace' ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium text-[10px]"
+                            title="Čas do automatického odpojení slotu při nečinnosti"
+                          >
+                            <Clock className="w-3 h-3" />
+                            <span>{graceSec ?? 0}s</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-zinc-400">Startuji…</span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-shrink-0 font-mono text-[10px]">
-                      {entry.status === 'downloading' ? (
-                        <div className="flex flex-col items-end">
-                          <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>{etaStr || 'Imunita'}</span>
-                          </span>
-                          {entry.speedBps > 0 && (
-                            <span className="text-[9px] text-zinc-500">{formatSpeed(entry.speedBps)}</span>
-                          )}
-                        </div>
-                      ) : entry.status === 'grace' ? (
-                        <span
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium"
-                          title="Čas do automatického odpojení slotu při nečinnosti"
-                        >
-                          <Clock className="w-3 h-3" />
-                          <span>{graceSec ?? 0}s</span>
-                        </span>
-                      ) : (
-                        <span className="text-zinc-400">Startuji…</span>
-                      )}
-                    </div>
+                    {/* Sleek 2px progress bar while downloading */}
+                    {entry.status === 'downloading' && hasPercent && (
+                      <div className="w-full h-0.5 bg-zinc-800/80">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            entry.hasPriority ? 'bg-orange-400' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.max(4, Math.min(100, entry.percent))}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -205,7 +223,7 @@ export default function QueueWidget({ onCancelDownload }) {
               {waiting.map((ticket) => (
                 <div
                   key={ticket.ticketId}
-                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs border ${
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs border ${
                     ticket.hasPriority
                       ? 'priority-fire-row'
                       : ticket.isYou
@@ -237,9 +255,7 @@ export default function QueueWidget({ onCancelDownload }) {
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-zinc-500 truncate max-w-[175px]" title={ticket.fileName}>
-                        {ticket.fileName}
-                      </div>
+                      <div className="text-[10px] text-zinc-500">Čeká ve frontě</div>
                     </div>
                   </div>
 

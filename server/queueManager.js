@@ -260,17 +260,21 @@ function buildStateSnapshotFor(viewerClientId) {
         ? Math.max(0, Math.ceil((lease.graceEndsAt - now) / 1000))
         : null;
 
+    const percent =
+      lease.status === 'grace'
+        ? 100
+        : lease.totalBytes > 0
+        ? Math.min(99, Math.max(0, Math.round((lease.transferredBytes / lease.totalBytes) * 100)))
+        : null;
+
     return {
       slot: idx + 1,
       isYou,
       label: isYou ? 'Ty' : `Žák #${getAnonNumber(lease.clientId)}`,
-      fileName: lease.fileName,
       type: lease.type,
       status: lease.status, // 'granted' | 'downloading' | 'grace'
       hasPriority: Boolean(lease.hasPriority),
-      totalBytes: lease.totalBytes || 0,
-      transferredBytes: lease.transferredBytes || 0,
-      speedBps: lease.speedBps || 0,
+      percent,
       etaSeconds: lease.etaSeconds,
       graceRemainingSeconds,
       graceEndsAt: lease.graceEndsAt,
@@ -284,7 +288,6 @@ function buildStateSnapshotFor(viewerClientId) {
       position: idx + 1,
       isYou,
       label: isYou ? 'Ty' : `Žák #${getAnonNumber(ticket.clientId)}`,
-      fileName: ticket.fileName,
       type: ticket.type,
       hasPriority: Boolean(ticket.hasPriority),
     };
@@ -878,12 +881,19 @@ async function withDownloadTransfer(clientId, credentials, meta, actionFn) {
     }
   };
 
+  const setKnownSize = (knownFileSize) => {
+    if (!isBatch && knownFileSize > 0 && (!lease.totalBytes || lease.totalBytes < knownFileSize)) {
+      lease.totalBytes = knownFileSize;
+      broadcastQueueState();
+    }
+  };
+
   try {
     entry = await acquirePhysicalClient(credentials);
     if (transferAborted || lease.canceled) {
       throw Object.assign(new Error('Přenos byl zrušen.'), { code: 'ERR_ABORTED' });
     }
-    return await actionFn(entry.client, { addChunkBytes, updateProgress, abortEntry });
+    return await actionFn(entry.client, { addChunkBytes, updateProgress, setKnownSize, abortEntry });
   } catch (err) {
     broken = true;
     throw err;
